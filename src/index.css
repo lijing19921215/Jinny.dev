@@ -72,6 +72,164 @@
   background-position: 0 0, 12px 12px;
 }
 
+/* ==========================================================================
+   HERO VISUAL — IP sticker + three-node semicircle orbit
+   Geometry / palette / timing ported verbatim from ricoui-home-lite.html:
+   ORBIT_RADIUS 190, node 56, star gold #f4d758, cream base #fdfaf2.
+   The only adaptation is the --ip-scale fit for the narrower React hero column.
+   ========================================================================== */
+.ip-study {
+  margin: 0;
+  min-width: 0;
+  position: relative;
+}
+
+.ip-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+}
+
+.desktop-sticker {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%) scale(var(--ip-scale, 1));
+  transform-origin: 50% 100%;
+  width: 280px;
+  max-width: 80%;
+  z-index: 2;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sticker-drag {
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sticker-drag:active {
+  cursor: grabbing;
+}
+
+.desktop-sticker > .sticker-drag > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  transition: filter 0.2s;
+}
+
+.desktop-sticker:hover > .sticker-drag > img {
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+.ip-orbit {
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 2;
+  transform-origin: 0 0;
+  animation: ip-orbit-sway 19s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes ip-orbit-sway {
+  from {
+    transform: rotate(-5deg);
+  }
+  to {
+    transform: rotate(5deg);
+  }
+}
+
+.ip-arc {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ip-arc path {
+  fill: none;
+  stroke: rgba(244, 215, 88, 0.7);
+  stroke-width: 2;
+  stroke-dasharray: 4 6;
+  animation: ip-arc-breathe 5.5s ease-in-out infinite alternate;
+}
+
+@keyframes ip-arc-breathe {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ip-node {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  padding: 0;
+  appearance: none;
+  background: #fdfaf2;
+  border: 2px solid #f4d758;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.22);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+  animation: ip-node-float var(--fdur, 4s) ease-in-out var(--fdelay, 0s)
+    infinite alternate;
+  cursor: pointer;
+}
+
+/* Existing project hover behavior is intentionally kept: lift + blue highlight. */
+.ip-node:hover,
+.ip-node:focus-visible {
+  transform: translateY(-6px) scale(1.14);
+  background: #edf4ff;
+  border-color: #1e63d6;
+  box-shadow: 0 6px 22px rgba(30, 99, 214, 0.3);
+}
+
+.ip-orbit:has(.ip-node:hover) .ip-node:not(:hover) {
+  box-shadow: none;
+}
+
+.ip-node-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@keyframes ip-node-float {
+  from {
+    translate: 0 -3px;
+  }
+  to {
+    translate: 0 3px;
+  }
+}
+
+@media (max-width: 600px) {
+  .ip-stage {
+    aspect-ratio: 1 / 1;
+  }
+}
+
 @media print {
   body {
     background: #ffffff;
@@ -84,5 +242,10 @@
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  .ip-orbit,
+  .ip-node,
+  .ip-arc path {
+    animation: none;
   }
 }

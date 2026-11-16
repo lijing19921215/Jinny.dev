@@ -53,9 +53,9 @@ export default function App() {
 
       <main className="mx-auto max-w-5xl px-6 sm:px-10">
         {/* Hero: 2-column split inside 1024px */}
-        <section className="pt-8 pb-16 sm:pt-14 sm:pb-24 grid grid-cols-1 lg:grid-cols-12 items-center gap-10 lg:gap-8">
+        <section className="pt-8 pb-16 sm:pt-14 sm:pb-24 grid grid-cols-1 lg:grid-cols-[minmax(0,.44fr)_minmax(0,.56fr)] items-center gap-10 lg:gap-0">
           {/* Hero Left */}
-          <div className="lg:col-span-7 space-y-7">
+          <div className="space-y-7">
             {/* Diagonal reveal headline */}
             <h1 className="font-display text-[38px] sm:text-[48px] lg:text-[52px] font-bold leading-[1.08] tracking-[-0.03em] text-balance">
               <span className="block overflow-hidden">
@@ -162,8 +162,8 @@ export default function App() {
             </motion.div>
           </div>
 
-          {/* Hero Right: Golden arc, IP illustration, and 3 clickable nodes */}
-          <div className="lg:col-span-5">
+          {/* Hero Right: IP sticker and 3 clickable nodes along the upper arc */}
+          <div>
             <HeroStage onSelectNode={handleSelectArcNode} />
           </div>
         </section>
