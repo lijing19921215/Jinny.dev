@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Between Design & Code · Final Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/commit-mono/400.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/commit-mono/700.css" />
+
+  <style>
+    :root {
+      --container-max: 64rem; /* 1024px 标准设计系统断点 */
+
+      /* 第 ⑥ 版暖纸三色基调 */
+      --canvas: #FEFCF8;
+      --surface: #FFFFFF;
+      --wash: #EDF4FF;
+      --ink: #0F172A;
+      --blue: #1E63D6;
+      --yellow: #FCE055;
+      --red: #EF4E5E;
+      --body: #374151;
+      --sepia: #786858;
+      --border: #E5E7EB;
+
+      --font-sans: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "Paper Mono", "PaperMono", "Commit Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+      --spring: cubic-bezier(0.22, 1, 0.36, 1);
+      --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    ::selection { background: var(--yellow); color: var(--ink); }
+
+    body {
+      background: var(--canvas);
+      color: var(--body);
+      font-family: var(--font-sans);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .shell {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 44px 40px 120px;
+    }
+    @media (max-width: 640px) { .shell { padding: 28px 20px 80px; } }
+
+    /* ================= 滚动“墨水落纸”显影动效 ================= */
+    .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+      filter: blur(3px);
+      transition: opacity 0.7s var(--spring), transform 0.7s var(--spring), filter 0.7s var(--spring);
+      will-change: opacity, transform, filter;
+    }
+    .reveal.in {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; filter: none; transition: none; }
+    }
+
+    /* ================= 顶部栏：安静 HH:MM 时钟 ================= */
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 72px; padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-left {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--font-mono); font-size: 13.5px; font-weight: 600; color: var(--ink);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.85); }
+    }
+    .dot-live {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--red);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);
+      animation: pulse 2.6s ease-in-out infinite;
+    }
+
+    .live-clock {
+      font-family: var(--font-mono); font-size: 13px; color: var(--sepia);
+      font-variant-numeric: tabular-nums;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .clock-dot { color: var(--blue); font-size: 10px; }
+    @keyframes colonBreath { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .clock-colon { animation: colonBreath 2s ease-in-out infinite; }
+
+    /* ================= 动效图标按钮 ================= */
+    .anim-icon-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--ink); text-decoration: none; font-family: var(--font-mono);
+      font-size: 13px; font-weight: 500;
+      padding: 7px 13px 7px 11px; border-radius: 8px;
+      background: transparent; border: 1px solid transparent; cursor: pointer;
+      transition: background 0.25s, border-color 0.25s, color 0.2s, transform 0.25s var(--bounce);
+    }
+    .anim-icon-btn:hover { background: #fff; border-color: var(--border); color: var(--blue); transform: translateY(-1px); }
+    .anim-icon-btn:active { transform: scale(0.92); }
+    .svg-ico { width: 16px; height: 16px; flex-shrink: 0; overflow: visible; }
+
+    .ico-doc .fold { transition: transform 0.35s var(--bounce); transform-origin: 14px 4px; }
+    .anim-icon-btn:hover .ico-doc .fold { transform: scale(1.28) translate(-1px, 1px); }
+    .ico-doc .l1, .ico-doc .l2 { transition: transform 0.3s var(--spring); }
+    .anim-icon-btn:hover .ico-doc .l1 { transform: translateX(1.5px); }
+    .anim-icon-btn:hover .ico-doc .l2 { transform: translateX(-1px); }
+
+    .ico-fish { transition: transform 0.35s var(--bounce); }
+    .stir-btn { color: var(--red); }
+    .stir-btn:hover { color: var(--red); background: #FFF2F3; border-color: #FAD2D6; }
+    .stir-btn:hover .ico-fish { transform: translateX(3px) rotate(-10deg) scale(1.12); }
+
+    .ico-mail .flap { transition: transform 0.35s var(--bounce); transform-origin: 12px 7px; }
+    .anim-icon-btn:hover .ico-mail .flap { transform: scaleY(-0.6); }
+
+    .ico-code .bl, .ico-code .br { transition: transform 0.3s var(--bounce); }
+    .anim-icon-btn:hover .ico-code .bl { transform: translateX(-2px); }
+    .anim-icon-btn:hover .ico-code .br { transform: translateX(2px); }
+
+    /* ================= HERO ================= */
+    .hero-wrap {
+      position: relative;
+      display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 56px; align-items: center;
+      margin-bottom: 92px; padding: 10px 0;
+    }
+    @media (max-width: 760px) { .hero-wrap { grid-template-columns: 1fr; gap: 36px; margin-bottom: 68px; } }
+
+    .fx-canvas {
+      position: absolute; inset: -28px; width: calc(100% + 56px); height: calc(100% + 56px);
+      pointer-events: none; z-index: 10;
+    }
+
+    @keyframes diaReveal {
+      from { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); opacity: 0.2; }
+      to { clip-path: polygon(0 0, 115% 0, 100% 100%, 0 100%); opacity: 1; }
+    }
+    .hero-left { position: relative; z-index: 2; }
+    .hero-left h1 {
+      font-family: var(--font-sans); font-weight: 700;
+      font-size: clamp(38px, 5.2vw, 56px);
+      line-height: 1.1; letter-spacing: -0.035em; color: var(--ink);
+      margin-bottom: 22px; animation: diaReveal 0.85s var(--spring) both;
+    }
+    .hero-left h1 .blue { color: var(--blue); display: block; }
+
+    .hero-bio {
+      font-family: var(--font-mono);
+      font-feature-settings: "ss02", "ss03", "cv01";
+      font-size: 15px; color: var(--body); max-width: 52ch; margin-bottom: 28px; line-height: 1.75;
+    }
+    .hero-bio .ch { display: inline-block; transition: opacity 0.25s ease; }
+
+    .hero-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .ip-stage { position: relative; height: 280px; display: flex; align-items: flex-end; justify-content: center; z-index: 2; }
+    .arc-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+    .arc-node {
+      position: absolute; width: 48px; height: 48px; border-radius: 50%;
+      background: #fff; border: 2px solid var(--yellow);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ink); cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+      transition: transform 0.38s var(--bounce), border-color 0.2s, background 0.2s, color 0.2s;
+    }
+    .arc-node:hover { transform: translateY(-5px) scale(1.12); border-color: var(--blue); background: var(--wash); color: var(--blue); }
+    .arc-node:active { transform: scale(0.92); }
+    .arc-node svg { width: 18px; height: 18px; transition: transform 0.45s var(--bounce); }
+    .arc-node:hover svg { transform: rotate(15deg) scale(1.12); }
+    .arc-node .tip {
+      position: absolute; top: 54px; font-family: var(--font-mono); font-size: 11px;
+      background: var(--yellow); color: var(--ink); padding: 2px 8px; border-radius: 4px;
+      font-weight: 600; white-space: nowrap; opacity: 0; transform: translateY(-3px);
+      transition: 0.25s var(--spring); pointer-events: none;
+    }
+    .arc-node:hover .tip { opacity: 1; transform: translateY(0); }
+    .n1 { left: 8%; top: 44%; }
+    .n2 { left: 50%; top: 6%; transform: translateX(-50%); }
+    .n2:hover { transform: translateX(-50%) translateY(-5px) scale(1.12); }
+    .n3 { right: 8%; top: 44%; }
+
+    /* ================= PROJECTS ================= */
+    .sec { margin-bottom: 84px; }
+
+    .proj-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px;
+    }
+    .proj-label {
+      display: inline-flex; align-items: center; gap: 9px;
+      font-family: var(--font-mono); font-size: 17px; color: var(--sepia);
+      cursor: default;
+    }
+    .proj-label svg { width: 19px; height: 19px; color: var(--blue); transition: transform 0.4s var(--bounce); }
+    .proj-label:hover svg { transform: rotate(-10deg) scale(1.12); }
+
+    .view-toggle { display: inline-flex; align-items: center; gap: 6px; }
+    .vt-btn {
+      width: 34px; height: 34px; border-radius: 8px;
+      background: transparent; border: 1px solid transparent;
+      color: #9CA3AF; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: color 0.2s, background 0.2s, transform 0.3s var(--bounce);
+    }
+    .vt-btn:hover { color: var(--ink); background: var(--wash); transform: translateY(-1px); }
+    .vt-btn:active { transform: scale(0.88); }
+    .vt-btn.on { color: var(--ink); background: #fff; border-color: var(--border); box-shadow: 0 2px 6px rgba(15,23,42,0.04); }
+    .vt-btn svg { width: 17px; height: 17px; transition: transform 0.3s var(--bounce); }
+    .vt-btn:hover svg { transform: scale(1.1); }
+
+    @keyframes viewFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 视图 A：☰ 列表模式 */
+    .list-view { display: flex; flex-direction: column; gap: 6px; animation: viewFadeIn 0.4s var(--spring); }
+    body.is-grid .list-view { display: none; }
+
+    .p-row {
+      position: relative; border-radius: 16px; padding: 18px 20px; margin: 0 -20px;
+      cursor: pointer; transition: background-color 0.28s ease;
+    }
+    .p-row:hover { background-color: color-mix(in srgb, var(--wash) 55%, #F6F5F0); }
+
+    .p-row-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .p-left { display: flex; align-items: center; gap: 18px; }
+
+    .app-squircle {
+      width: 46px; height: 46px; border-radius: 13px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.7);
+      transition: transform 0.4s var(--bounce);
+    }
+    .p-row:hover .app-squircle { transform: scale(1.07) rotate(-4deg); }
+    .app-squircle svg { width: 22px; height: 22px; }
+
+    .p-name { font-family: var(--font-sans); font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+    .p-sub { font-size: 14.5px; color: var(--sepia); margin-top: 2px; }
+
+    .p-right {
+      display: flex; align-items: center; gap: 12px;
+      font-family: var(--font-mono); font-size: 13px; color: var(--sepia); flex-shrink: 0;
+    }
+    .p-arrow {
+      opacity: 0; transform: translate(-4px, 4px); color: var(--blue); font-weight: 700;
+      transition: opacity 0.25s ease, transform 0.35s var(--bounce);
+    }
+    .p-row:hover .p-arrow { opacity: 1; transform: translate(0, 0); }
+
+    /* Hover 扇形斜角预览卡 */
+    .fan-stage {
+      max-height: 0; opacity: 0; overflow: hidden;
+      transition: max-height 0.46s var(--spring), opacity 0.32s ease, margin-top 0.38s var(--spring);
+      position: relative;
+      mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+    }
+    .p-row:hover .fan-stage { max-height: 124px; opacity: 1; margin-top: 18px; }
+
+    .fan-deck { display: flex; justify-content: center; align-items: flex-end; height: 118px; padding-top: 14px; }
+    .fan-card {
+      width: 158px; height: 102px; background: #FFFFFF; border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+      margin-left: -18px; transition: transform 0.48s var(--bounce);
+      display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; flex-shrink: 0;
+    }
+    .fan-card:first-child { margin-left: 0; }
+    .fc-1 { transform: translateY(22px); background: var(--wash); border-color: #D2E3FC; }
+    .fc-2 { transform: translateY(22px); background: #FFFFFF; }
+    .fc-3 { transform: translateY(22px); background: #FFFCF0; border-color: #F7E89C; }
+    .fc-4 { transform: translateY(22px); background: #FFF5F6; border-color: #FAD3D8; }
+
+    .p-row:hover .fc-1 { transform: translateY(6px) rotate(-5.5deg); }
+    .p-row:hover .fc-2 { transform: translateY(0px) rotate(-1.5deg); }
+    .p-row:hover .fc-3 { transform: translateY(2px) rotate(2.5deg); }
+    .p-row:hover .fc-4 { transform: translateY(8px) rotate(5.5deg); }
+
+    .fc-k { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--ink); }
+    .fc-v { font-family: var(--font-mono); font-size: 10.5px; color: var(--sepia); line-height: 1.45; }
+
+    /* 视图 B：⊞ 大图展窗模式 */
+    .grid-view { display: none; flex-direction: column; gap: 44px; animation: viewFadeIn 0.4s var(--spring); }
+    body.is-grid .grid-view { display: flex; }
+
+    .g-item { cursor: pointer; }
+    .g-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+    .g-title { font-family: var(--font-sans); font-size: 19px; font-weight: 700; color: var(--ink); }
+    .g-meta { font-family: var(--font-mono); font-size: 13px; color: var(--sepia); display: inline-flex; align-items: center; gap: 6px; }
+
+    .g-stage {
+      height: 290px; border-radius: 16px; position: relative; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding-top: 38px; border: 1px solid rgba(15, 23, 42, 0.05);
+      transition: transform 0.4s var(--spring);
+    }
+    .g-item:hover .g-stage { transform: translateY(-2px); }
+    .g-stage-blue { background: linear-gradient(180deg, #D8E8FF 0%, #EDF4FF 100%); }
+    .g-stage-yellow { background: linear-gradient(180deg, #FDF0B2 0%, #FEF8DC 100%); }
+    .g-stage-red { background: linear-gradient(180deg, #FDE2E5 0%, #FFF2F4 100%); }
+
+    .g-logo {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 26px; transition: transform 0.4s var(--bounce);
+    }
+    .g-item:hover .g-logo { transform: scale(1.12) rotate(-6deg); }
+
+    .g-browser {
+      width: 82%; max-width: 680px; height: 220px; background: #FFFFFF;
+      border-radius: 12px 12px 0 0; border: 1px solid rgba(15,23,42,0.08);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); padding: 18px 24px;
+      transition: transform 0.45s var(--spring);
+    }
+    .g-item:hover .g-browser { transform: translateY(-8px); }
+    .g-cap { font-size: 14.5px; color: var(--sepia); margin-top: 12px; }
+
+    /* ================= EXPERIENCE（时间放右侧，与 projects 垂直对齐！） ================= */
+    .exp-row {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 28px;
+      padding: 20px 14px; margin: 0 -14px; border-radius: 12px;
+      border-bottom: 1px solid var(--border);
+      transition: background-color 0.25s ease;
+    }
+    .exp-row:first-of-type { border-top: 1px solid var(--border); }
+    .exp-row:hover { background-color: color-mix(in srgb, var(--wash) 35%, transparent); }
+    @media (max-width: 640px) { .exp-row { flex-direction: column; gap: 6px; } }
+
+    .exp-role { font-family: var(--font-sans); font-size: 16.5px; font-weight: 700; color: var(--ink); }
+    .exp-sub { font-size: 14.5px; color: var(--body); margin-top: 4px; max-width: 60ch; }
+    .exp-yr {
+      font-family: var(--font-mono); font-size: 13px; color: var(--blue); font-weight: 600;
+      white-space: nowrap; flex-shrink: 0;
+      transition: transform 0.3s var(--bounce);
+    }
+    .exp-row:hover .exp-yr { transform: translateX(-3px); }
+    .hl { background: var(--yellow); color: var(--ink); padding: 0 6px; border-radius: 4px; font-weight: 600; }
+
+    /* ================= 温暖落款 + 滚入视口自动手写签名 ================= */
+    .sign-wrap {
+      display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap;
+      margin-bottom: 36px; padding: 24px 26px; background: #fff; border: 1px solid var(--border); border-radius: 14px;
+    }
+    .warm-note { font-size: 15px; color: var(--ink); max-width: 58ch; }
+    .sig-box { cursor: pointer; display: flex; flex-direction: column; align-items: flex-end; }
+    .sig-svg { width: 124px; height: 44px; overflow: visible; }
+    .sig-path {
+      fill: none; stroke: var(--blue); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
+      stroke-dasharray: 280; stroke-dashoffset: 280;
+      transition: stroke-dashoffset 1.35s var(--spring);
+    }
+    .sign-wrap.in .sig-path { stroke-dashoffset: 0; }
+    .sig-box.drawing .sig-path { stroke-dashoffset: 280 !important; transition: none !important; }
+
+    footer {
+      padding-top: 24px; border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+      font-family: var(--font-mono); font-size: 12.5px; color: var(--sepia);
+    }
+    .copy-ok { color: var(--blue); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <div class="shell">
+    <!-- 顶部栏：极简实时 HH:MM 时钟（无秒数/毫秒跳动） -->
+    <header class="topbar">
+      <div class="brand-left">
+        <span class="dot-live"></span>
+        <span>alex.dev</span>
+      </div>
+
+      <div class="live-clock" title="Local time">
+        <span class="clock-dot">●</span>
+        <span>
+          <span id="clock-h">--</span><span class="clock-colon">:</span><span id="clock-m">--</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- 1. HERO -->
+    <section class="hero-wrap" id="hero-stage">
+      <canvas class="fx-canvas" id="fx-canvas"></canvas>
+
+      <div class="hero-left">
+        <h1>I work between <span class="blue">design and code</span></h1>
+        <p class="hero-bio" id="hero-bio">
+          Frontend engineer crafting expressive interfaces, creative coding sketches, and calm tools that feel human.
+        </p>
+        <div class="hero-actions">
+          <a href="#experience" class="anim-icon-btn">
+            <svg class="svg-ico ico-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline class="fold" points="14 2 14 8 20 8"/>
+              <line class="l1" x1="8" y1="13" x2="16" y2="13"/>
+              <line class="l2" x1="8" y1="17" x2="13" y2="17"/>
+            </svg>
+            <span>resume ↗</span>
+          </a>
+
+          <button class="anim-icon-btn stir-btn" onclick="triggerFishPass()">
+            <svg class="svg-ico ico-fish" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.46-3.44 6-7 6s-7.56-2.54-8.5-6Z"/>
+              <path d="M18 12v.5"/>
+              <path d="M6.5 12 2 8v8l4.5-4Z"/>
+            </svg>
+            <span>stir the words</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="ip-stage">
+        <svg class="arc-svg" viewBox="0 0 340 280" fill="none">
+          <path d="M 40 160 A 130 130 0 0 1 300 160" stroke="#FCE055" stroke-width="2" stroke-dasharray="3 6"/>
+          <circle cx="170" cy="206" r="40" fill="#FFF5F5" stroke="#EF4E5E" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <text x="170" y="210" text-anchor="middle" font-size="11" fill="#EF4E5E" font-family="monospace">[小红帽 IP]</text>
+        </svg>
+
+        <button class="arc-node n1" onclick="scrollToSec('projects-sec')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l1.9 5.8L20 10l-5.1 3.7L16.8 20 12 16.5 7.2 20l1.9-6.3L4 10l6.1-1.2z"/></svg>
+          <span class="tip">Creative Coding</span>
+        </button>
+        <button class="arc-node n2" onclick="scrollToSec('projects-sec')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 4-1 1 4 4 1-1a2.83 2.83 0 1 0-4-4z"/><path d="m13 6-9 9a2.83 2.83 0 1 0 4 4l9-9"/></svg>
+          <span class="tip">AI Style Skill</span>
+        </button>
+        <button class="arc-node n3" onclick="scrollToSec('experience')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span class="tip">Experience</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. PROJECTS -->
+    <section class="sec reveal" id="projects-sec">
+      <div class="proj-header">
+        <div class="proj-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M14 2v6h6"/>
+            <path d="M8 13h8M8 17h5"/>
+          </svg>
+          <span>projects</span>
+        </div>
+
+        <div class="view-toggle">
+          <button class="vt-btn on" id="btn-list" onclick="setProjView('list')" title="List view">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="16" y2="12"/><line x1="4" y1="18" x2="19" y2="18"/>
+            </svg>
+          </button>
+          <button class="vt-btn" id="btn-grid" onclick="setProjView('grid')" title="Showcase view">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/>
+              <rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ☰ 列表模式（Hover 绽放扇形小卡片） -->
+      <div class="list-view">
+        <div class="p-row" onclick="triggerFishPass()">
+          <div class="p-row-top">
+            <div class="p-left">
+              <div class="app-squircle" style="background: #FFF0F2; color: var(--red);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.46-3.44 6-7 6s-7.56-2.54-8.5-6Z"/><path d="M6.5 12 2 8v8l4.5-4Z"/></svg>
+              </div>
+              <div>
+                <div class="p-name">fish-to-birds</div>
+                <div class="p-sub">60fps DOM + Canvas hybrid particle interaction with zero layout thrashing.</div>
+              </div>
+            </div>
+            <div class="p-right">
+              <span>☆ 60fps</span>
+              <span class="p-arrow">↗</span>
+            </div>
+          </div>
+          <div class="fan-stage">
+            <div class="fan-deck">
+              <div class="fan-card fc-1"><div class="fc-k" style="color:var(--blue);">Preview</div><div class="fc-v">Red koi disturbs text into flying birds & eases back.</div></div>
+              <div class="fan-card fc-2"><div class="fc-k">Architecture</div><div class="fc-v">Cached char rects<br>GPU opacity only<br>ResizeObserver</div></div>
+              <div class="fan-card fc-3"><div class="fc-k">TypeScript</div><div class="fc-v">Canvas 2D<br>Path2D<br>Zero deps</div></div>
+              <div class="fan-card fc-4"><div class="fc-k" style="color:var(--red);">Live</div><div class="fc-v">2026<br>Click row to replay</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-row">
+          <div class="p-row-top">
+            <div class="p-left">
+              <div class="app-squircle" style="background: #FFF8D6; color: var(--ink);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m15 4-1 1 4 4 1-1a2.83 2.83 0 1 0-4-4z"/><path d="m13 6-9 9a2.83 2.83 0 1 0 4 4l9-9"/></svg>
+              </div>
+              <div>
+                <div class="p-name">style-transfer skill</div>
+                <div class="p-sub">Consistent image-to-illustration AI skill built for personal visual craft.</div>
+              </div>
+            </div>
+            <div class="p-right">
+              <span>AI Skill</span>
+              <span class="p-arrow">↗</span>
+            </div>
+          </div>
+          <div class="fan-stage">
+            <div class="fan-deck">
+              <div class="fan-card fc-1"><div class="fc-k" style="color:var(--blue);">Pipeline</div><div class="fc-v">Raw photo → Prompt tokens → Crayon style</div></div>
+              <div class="fan-card fc-2"><div class="fc-k">Why built</div><div class="fc-v">Keep personal IP assets unified cleanly.</div></div>
+              <div class="fan-card fc-3"><div class="fc-k">Format</div><div class="fc-v">SKILL.md<br>Style Rules<br>Color Lock</div></div>
+              <div class="fan-card fc-4"><div class="fc-k" style="color:var(--red);">Showcase</div><div class="fc-v">2026<br>Before / After</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-row">
+          <div class="p-row-top">
+            <div class="p-left">
+              <div class="app-squircle" style="background: var(--wash); color: var(--blue);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l1.9 5.8L20 10l-5.1 3.7L16.8 20 12 16.5 7.2 20l1.9-6.3L4 10l6.1-1.2z"/></svg>
+              </div>
+              <div>
+                <div class="p-name">creative coding lab</div>
+                <div class="p-sub">12+ interactive motion, shader, and spring-physics sketches in the browser.</div>
+              </div>
+            </div>
+            <div class="p-right">
+              <span>12+ works</span>
+              <span class="p-arrow">↗</span>
+            </div>
+          </div>
+          <div class="fan-stage">
+            <div class="fan-deck">
+              <div class="fan-card fc-1"><div class="fc-k" style="color:var(--blue);">Experiments</div><div class="fc-v">Particle fields, springs, kinetic typography.</div></div>
+              <div class="fan-card fc-2"><div class="fc-k">Tech Stack</div><div class="fc-v">React<br>Canvas 2D<br>SVG Paths</div></div>
+              <div class="fan-card fc-3"><div class="fc-k">Focus</div><div class="fc-v">Tactile feel<br>Reduced motion</div></div>
+              <div class="fan-card fc-4"><div class="fc-k" style="color:var(--red);">Gallery</div><div class="fc-v">2025–26<br>Interactive</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ⊞ 大图展窗模式 -->
+      <div class="grid-view">
+        <div class="g-item" onclick="triggerFishPass()">
+          <div class="g-head"><span class="g-title">fish-to-birds</span><span class="g-meta">☆ 60fps ↗</span></div>
+          <div class="g-stage g-stage-blue">
+            <div class="g-logo" style="background:var(--blue);color:#fff;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.46-3.44 6-7 6s-7.56-2.54-8.5-6Z"/><path d="M6.5 12 2 8v8l4.5-4Z"/></svg>
+            </div>
+            <div class="g-browser">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--sepia);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:14px;">
+                <span>fish-to-birds.tsx</span><span style="color:var(--blue);">Zero Layout Thrashing</span>
+              </div>
+              <div style="font-size:18px;font-weight:700;color:var(--ink);">DOM prose + single Canvas overlay</div>
+              <div style="font-family:var(--font-mono);font-size:12px;color:var(--sepia);margin-top:6px;">Cached coordinates · 0.2ms per frame</div>
+            </div>
+          </div>
+          <p class="g-cap">60fps DOM + Canvas hybrid particle interaction with zero layout thrashing.</p>
+        </div>
+
+        <div class="g-item">
+          <div class="g-head"><span class="g-title">style-transfer skill</span><span class="g-meta">AI Skill ↗</span></div>
+          <div class="g-stage g-stage-yellow">
+            <div class="g-logo" style="background:var(--ink);color:var(--yellow);">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 4-1 1 4 4 1-1a2.83 2.83 0 1 0-4-4z"/><path d="m13 6-9 9a2.83 2.83 0 1 0 4 4l9-9"/></svg>
+            </div>
+            <div class="g-browser">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--sepia);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:14px;">
+                <span>SKILL.md</span><span style="color:var(--red);">Warm Crayon Output</span>
+              </div>
+              <div style="font-size:18px;font-weight:700;color:var(--ink);">Predictable visual style pipeline</div>
+              <div style="font-family:var(--font-mono);font-size:12px;color:var(--sepia);margin-top:6px;">Consistent palette & line discipline across assets</div>
+            </div>
+          </div>
+          <p class="g-cap">Consistent image-to-illustration AI skill built for personal visual craft.</p>
+        </div>
+
+        <div class="g-item">
+          <div class="g-head"><span class="g-title">creative coding lab</span><span class="g-meta">12+ works ↗</span></div>
+          <div class="g-stage g-stage-red">
+            <div class="g-logo" style="background:var(--red);color:#fff;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l1.9 5.8L20 10l-5.1 3.7L16.8 20 12 16.5 7.2 20l1.9-6.3L4 10l6.1-1.2z"/></svg>
+            </div>
+            <div class="g-browser">
+              <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:11px;color:var(--sepia);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:14px;">
+                <span>/craft</span><span style="color:var(--blue);">Spring Physics & Shaders</span>
+              </div>
+              <div style="font-size:18px;font-weight:700;color:var(--ink);">12+ interactive browser sketches</div>
+              <div style="font-family:var(--font-mono);font-size:12px;color:var(--sepia);margin-top:6px;">React · Canvas 2D · SVG Motion</div>
+            </div>
+          </div>
+          <p class="g-cap">12+ interactive motion, shader, and spring-physics sketches in the browser.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. EXPERIENCE（时间移至右侧对齐） -->
+    <section class="sec reveal" id="experience">
+      <div class="proj-label" style="margin-bottom:20px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>experience</span>
+      </div>
+
+      <div class="exp-row">
+        <div>
+          <div class="exp-role">Independent Frontend R&D & Creative Coding</div>
+          <div class="exp-sub">Focused deeply on <span class="hl">motion performance</span>, visual craft, and practical AI developer skills.</div>
+        </div>
+        <span class="exp-yr">2025 – Now</span>
+      </div>
+      <div class="exp-row">
+        <div>
+          <div class="exp-role">Frontend Engineer · [Previous Company]</div>
+          <div class="exp-sub">Shipped accessible React & TypeScript apps, improved page responsiveness, and worked closely with design.</div>
+        </div>
+        <span class="exp-yr">2022 – 2024</span>
+      </div>
+    </section>
+
+    <!-- 4. 温暖落款 + 滚入视口自动绘制的手写签名 -->
+    <div class="sign-wrap reveal" id="sign-block">
+      <div class="warm-note">
+        I'm open to Frontend or Design Engineer roles. Always happy to walk through my code or chat about interactive craft.
+      </div>
+      <div class="sig-box" onclick="replaySignature(this)" title="Click to replay handwritten signature">
+        <svg class="sig-svg" viewBox="0 0 140 48">
+          <path class="sig-path" d="M 10 36 C 22 10, 32 8, 28 38 C 25 22, 42 18, 46 32 C 50 40, 58 20, 66 28 C 72 34, 80 12, 84 32 C 88 22, 98 20, 104 30 C 110 38, 122 24, 132 28" />
+        </svg>
+        <span style="font-family:var(--font-mono);font-size:10px;color:var(--sepia);">click to sign ✍</span>
+      </div>
+    </div>
+
+    <footer class="reveal">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="anim-icon-btn" onclick="copyEmail(this)">
+          <svg class="svg-ico ico-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path class="flap" d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+          <span>hello@yourname.dev</span>
+        </button>
+
+        <a href="#" class="anim-icon-btn">
+          <svg class="svg-ico ico-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <polyline class="bl" points="8 6 2 12 8 18"/>
+            <polyline class="br" points="16 18 22 12 16 6"/>
+          </svg>
+          <span>GitHub ↗</span>
+        </a>
+      </div>
+      <label style="cursor:pointer;" title="Click to load local PaperMono file">
+        Space Grotesk + <span id="paper-lbl">Paper Mono</span> · 2026
+        <input type="file" accept=".woff2,.woff,.ttf,.otf" hidden onchange="loadPaperFont(this.files[0])" />
+      </label>
+    </footer>
+  </div>
+
+  <script>
+    // 1. 安静 HH:MM 实时时钟（无秒数/毫秒）
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("clock-h").textContent = String(now.getHours()).padStart(2, "0");
+      document.getElementById("clock-m").textContent = String(now.getMinutes()).padStart(2, "0");
+    }
+    updateClock();
+    setInterval(updateClock, 15000);
+
+    // 2. 滚动“墨水落纸”显影 & 滑到底部自动手写签名
+    const revealObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in");
+          revealObs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.14 });
+    document.querySelectorAll(".reveal").forEach(el => revealObs.observe(el));
+
+    // 3. 视图切换
+    function setProjView(mode) {
+      document.body.classList.toggle("is-grid", mode === "grid");
+      document.getElementById("btn-list").classList.toggle("on", mode === "list");
+      document.getElementById("btn-grid").classList.toggle("on", mode === "grid");
+    }
+
+    function scrollToSec(id) {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function replaySignature(box) {
+      box.classList.add("drawing"); void box.offsetWidth; box.classList.remove("drawing");
+    }
+
+    function copyEmail(btn) {
+      const span = btn.querySelector("span"), orig = "hello@yourname.dev";
+      if (navigator.clipboard) navigator.clipboard.writeText(orig).catch(()=>{});
+      span.innerHTML = '<span class="copy-ok">copied ✓</span>';
+      setTimeout(() => { span.textContent = orig; }, 1600);
+    }
+
+    async function loadPaperFont(file) {
+      if (!file) return;
+      const buf = await file.arrayBuffer();
+      const font = new FontFace("Paper Mono", buf);
+      await font.load();
+      document.fonts.add(font);
+      document.getElementById("paper-lbl").textContent = "Paper Mono ✓";
+      setTimeout(measureChars, 60);
+    }
+
+    // 4. 60fps 红鱼惊鸟引擎（带视口不可见自动省电暂停）
+    const heroStage = document.getElementById("hero-stage");
+    const bioEl = document.getElementById("hero-bio");
+    const canvas = document.getElementById("fx-canvas");
+    const ctx = canvas.getContext("2d");
+
+    const rawText = bioEl.textContent.trim();
+    bioEl.innerHTML = rawText.split(" ").map(word =>
+      `<span style="white-space:nowrap">${[...word].map(c => `<span class="ch">${c}</span>`).join("")}</span>`
+    ).join(" ");
+
+    let charMeta = [], birds = [], fish = { active: false, t: 0, x: 0, y: 0, angle: Math.PI }, rafId = null;
+    let heroVisible = true;
+
+    const heroObs = new IntersectionObserver((entries) => {
+      heroVisible = entries[0].isIntersecting;
+    }, { threshold: 0.05 });
+    heroObs.observe(heroStage);
+
+    function resizeCanvas() {
+      const dpr = window.devicePixelRatio || 1, rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function measureChars() {
+      resizeCanvas();
+      const cRect = canvas.getBoundingClientRect();
+      charMeta = [...bioEl.querySelectorAll(".ch")].map(el => {
+        const r = el.getBoundingClientRect();
+        return { el, x: r.left - cRect.left + r.width / 2, y: r.top - cRect.top + r.height / 2, hidden: false };
+      });
+    }
+    function spawnBird(meta) {
+      meta.hidden = true; meta.el.style.opacity = "0";
+      birds.push({
+        meta, sx: meta.x, sy: meta.y,
+        px: meta.x + 50 + Math.random() * 130, py: meta.y - (50 + Math.random() * 75),
+        age: 0, life: 1.5 + Math.random() * 0.5, wingSpeed: 10 + Math.random() * 5, phase: Math.random() * Math.PI * 2
+      });
+    }
+    function drawBird(b, p) {
+      let bx, by;
+      if (p < 0.45) {
+        const u = p / 0.45, ease = 1 - Math.pow(1 - u, 3);
+        bx = b.sx + (b.px - b.sx) * ease; by = b.sy + (b.py - b.sy) * ease;
+      } else {
+        const u = (p - 0.45) / 0.55, ease = u * u * (3 - 2 * u);
+        bx = b.px + (b.sx - b.px) * ease; by = b.py + (b.sy - b.py) * ease;
+      }
+      const flap = Math.sin(b.age * b.wingSpeed + b.phase) * 5;
+      ctx.save(); ctx.translate(bx, by);
+      ctx.strokeStyle = "#374151"; ctx.lineWidth = 1.7; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-6, flap); ctx.quadraticCurveTo(-3, -3, 0, 0); ctx.quadraticCurveTo(3, -3, 6, flap);
+      ctx.stroke(); ctx.restore();
+    }
+    function drawFish(x, y, angle, time) {
+      const wag = Math.sin(time * 12) * 4;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+      ctx.fillStyle = "rgba(239, 78, 94, 0.55)";
+      ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-27, -7 + wag); ctx.lineTo(-23, wag * 0.4); ctx.lineTo(-27, 7 + wag); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#EF4E5E";
+      ctx.beginPath(); ctx.moveTo(14, 0); ctx.quadraticCurveTo(4, -7.5, -14, 0); ctx.quadraticCurveTo(4, 7.5, 14, 0); ctx.fill();
+      ctx.restore();
+    }
+
+    let lastTime = 0;
+    function tick(now) {
+      if (!lastTime) lastTime = now;
+      const dt = Math.min(0.05, (now - lastTime) / 1000); lastTime = now;
+      const cRect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, cRect.width, cRect.height);
+
+      if (fish.active) {
+        fish.t += dt / 3.4;
+        const u = Math.min(1, fish.t), startX = cRect.width * 0.72, endX = 24, midY = cRect.height * 0.52;
+        const px = fish.x, py = fish.y;
+        if (u < 0.55) {
+          const p = u / 0.55, ease = p * (2 - p);
+          fish.x = startX + (endX - startX) * ease;
+          fish.y = midY + Math.sin(p * Math.PI * 2.5) * 26;
+        } else {
+          const p = (u - 0.55) / 0.45, ease = p * p * (3 - 2 * p);
+          fish.x = endX + (startX - endX) * ease;
+          fish.y = midY - Math.sin(p * Math.PI) * 58;
+        }
+        if (fish.t > 0.02) fish.angle = Math.atan2(fish.y - py, fish.x - px);
+        if (heroVisible) drawFish(fish.x, fish.y, fish.angle, now / 1000);
+
+        for (const m of charMeta) {
+          if (!m.hidden) {
+            const dx = m.x - fish.x, dy = m.y - fish.y;
+            if (dx * dx + dy * dy < 800) spawnBird(m);
+          }
+        }
+        if (u >= 1) fish.active = false;
+      }
+
+      for (let i = birds.length - 1; i >= 0; i--) {
+        const b = birds[i]; b.age += dt;
+        const p = b.age / b.life;
+        if (p >= 1) { b.meta.el.style.opacity = "1"; b.meta.hidden = false; birds.splice(i, 1); }
+        else if (heroVisible) drawBird(b, p);
+      }
+
+      if (fish.active || birds.length > 0) rafId = requestAnimationFrame(tick);
+      else { rafId = null; lastTime = 0; }
+    }
+
+    function triggerFishPass() {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (charMeta.length === 0) measureChars();
+      fish.active = true; fish.t = 0;
+      const cRect = canvas.getBoundingClientRect();
+      fish.x = cRect.width * 0.72; fish.y = cRect.height * 0.65;
+      if (!rafId) { lastTime = 0; rafId = requestAnimationFrame(tick); }
+    }
+
+    window.addEventListener("resize", () => { clearTimeout(window.__rt); window.__rt = setTimeout(measureChars, 120); });
+    window.addEventListener("load", () => {
+      measureChars();
+      setTimeout(triggerFishPass, 700);
+    });
+  </script>
+</body>
+</html>
