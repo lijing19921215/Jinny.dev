@@ -53,8 +53,16 @@
     Monaco, Consolas, monospace;
 }
 
+.font-script {
+  font-family: "Reenie Beanie", "Comic Sans MS", cursive;
+}
+
 .bio-features {
   font-feature-settings: "ss02" 1, "ss03" 1, "cv01" 1;
+}
+
+.code-features {
+  font-feature-settings: "ss01" 1, "zero" 1;
 }
 
 .tabular-nums {
@@ -70,6 +78,32 @@
     radial-gradient(rgba(15, 23, 42, 0.025) 1px, transparent 0);
   background-size: 24px 24px;
   background-position: 0 0, 12px 12px;
+}
+
+/* Crisp architectural dot-matrix studio canvas */
+.dot-grid-paper {
+  background-color: #fefcf8;
+  background-image: radial-gradient(
+    rgba(15, 23, 42, 0.085) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+  background-position: 11px 11px;
+}
+
+/* Scalloped postage-stamp paper mask (paired with parent filter: drop-shadow) */
+.stamp-card-mask {
+  mask-image: linear-gradient(#000, #000),
+    radial-gradient(circle at 8px 8px, #000 5.6px, transparent 6px);
+  mask-position: center, 0 0;
+  mask-size: calc(100% - 10px) calc(100% - 10px), 16px 16px;
+  mask-repeat: no-repeat, round;
+  mask-composite: add;
+  -webkit-mask-image: linear-gradient(#000, #000),
+    radial-gradient(circle at 8px 8px, #000 5.6px, transparent 6px);
+  -webkit-mask-position: center, 0 0;
+  -webkit-mask-size: calc(100% - 10px) calc(100% - 10px), 16px 16px;
+  -webkit-mask-repeat: no-repeat, round;
 }
 
 /* ==========================================================================
@@ -113,52 +147,52 @@
   cursor: grabbing;
 }
 
-.desktop-sticker > .sticker-drag > img {
+.desktop-sticker .sticker-drag > img {
+  position: relative;
+  z-index: 2;
   display: block;
   width: 100%;
   height: auto;
   pointer-events: none;
-  transition: filter 0.2s;
+  filter: drop-shadow(0 16px 26px rgba(0, 0, 0, 0.24));
+  transition: filter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.desktop-sticker:hover > .sticker-drag > img {
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+.desktop-sticker:hover .sticker-drag > img,
+.desktop-sticker .sticker-drag:active > img {
+  filter: drop-shadow(0 22px 34px rgba(0, 0, 0, 0.32));
 }
 
-.ip-orbit {
+/* Un-transformed anchor so child nodes can interleave z-index 1 (behind IP) & 3 (in front) */
+.ip-orbit-anchor {
   position: absolute;
   left: 50%;
-  top: 15%;
+  top: 16%;
   width: 0;
   height: 0;
   pointer-events: none;
-  z-index: 2;
-  transform-origin: 0 0;
-  animation: ip-orbit-sway 19s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-@keyframes ip-orbit-sway {
-  from {
-    transform: rotate(-5deg);
-  }
-  to {
-    transform: rotate(5deg);
-  }
 }
 
 .ip-arc {
   position: absolute;
   overflow: visible;
   pointer-events: none;
+  z-index: 1;
 }
 
+.ip-arc ellipse,
 .ip-arc path {
   fill: none;
-  stroke: rgba(244, 215, 88, 0.7);
+  stroke: rgba(244, 215, 88, 0.75);
   stroke-width: 2;
   stroke-dasharray: 4 6;
   animation: ip-arc-breathe 5.5s ease-in-out infinite alternate;
+  transition: stroke 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+}
+
+.ip-arc.is-active ellipse,
+.ip-arc.is-active path {
+  stroke: rgba(30, 99, 214, 0.65);
 }
 
 @keyframes ip-arc-breathe {
@@ -170,11 +204,21 @@
   }
 }
 
-.ip-node {
+.ip-node-slot {
   position: absolute;
+  left: 0;
+  top: 0;
   width: 56px;
   height: 56px;
   margin: -28px 0 0 -28px;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ip-node {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -183,25 +227,30 @@
   appearance: none;
   background: #fdfaf2;
   border: 2px solid #f4d758;
-  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.22);
-  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.28s ease, background 0.25s ease, border-color 0.25s ease,
+    opacity 0.25s ease;
   animation: ip-node-float var(--fdur, 4s) ease-in-out var(--fdelay, 0s)
     infinite alternate;
   cursor: pointer;
 }
 
-/* Existing project hover behavior is intentionally kept: lift + blue highlight. */
 .ip-node:hover,
 .ip-node:focus-visible {
   transform: translateY(-6px) scale(1.14);
   background: #edf4ff;
   border-color: #1e63d6;
-  box-shadow: 0 6px 22px rgba(30, 99, 214, 0.3);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.28);
 }
 
-.ip-orbit:has(.ip-node:hover) .ip-node:not(:hover) {
-  box-shadow: none;
+.ip-node:active {
+  transform: translateY(-3px) scale(0.96);
+}
+
+.ip-orbit-anchor:has(.ip-node:hover) .ip-node:not(:hover) {
+  opacity: 0.72;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .ip-node-img {
@@ -243,8 +292,8 @@
   html {
     scroll-behavior: auto;
   }
-  .ip-orbit,
   .ip-node,
+  .ip-arc ellipse,
   .ip-arc path {
     animation: none;
   }

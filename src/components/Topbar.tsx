@@ -8,7 +8,17 @@ function getFormattedTime() {
   return { hours, minutes };
 }
 
-export const Topbar: React.FC = () => {
+export interface TopbarProps {
+  onBrandClick?: () => void;
+  breadcrumb?: string;
+  className?: string;
+}
+
+export const Topbar: React.FC<TopbarProps> = ({
+  onBrandClick,
+  breadcrumb,
+  className = 'w-full pt-8 pb-6 sm:pt-10 sm:pb-8 no-print'
+}) => {
   const [time, setTime] = useState(getFormattedTime);
   const [colonVisible, setColonVisible] = useState(true);
   const prefersReduced = useReducedMotion();
@@ -30,8 +40,12 @@ export const Topbar: React.FC = () => {
     };
   }, [prefersReduced]);
 
-  const scrollToTop = (e: React.MouseEvent<HTMLAnchorElement>) => {
+  const handleBrandClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
+    if (onBrandClick) {
+      onBrandClick();
+      return;
+    }
     window.scrollTo({
       top: 0,
       behavior: prefersReduced ? 'auto' : 'smooth'
@@ -39,36 +53,51 @@ export const Topbar: React.FC = () => {
   };
 
   return (
-    <header className="w-full pt-8 pb-6 sm:pt-10 sm:pb-8 no-print">
-      <div className="mx-auto max-w-5xl px-6 sm:px-10 flex items-center justify-between gap-8">
-        <a
-          href="#top"
-          onClick={scrollToTop}
-          className="inline-flex items-center gap-2.5 text-[#0F172A] hover:opacity-80 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1E63D6] rounded-sm whitespace-nowrap shrink-0"
-          aria-label="alex.dev home"
-        >
-          <span className="relative flex h-2.5 w-2.5 items-center justify-center">
-            {!prefersReduced && (
-              <motion.span
+    <header className={className}>
+      <div className="w-full px-6 sm:px-10 flex items-center justify-between gap-8">
+        <div className="pointer-events-auto inline-flex items-center gap-2.5 whitespace-nowrap shrink-0">
+          <a
+            href="#top"
+            onClick={handleBrandClick}
+            className="inline-flex items-center gap-2.5 text-[#0F172A] hover:opacity-80 active:scale-[0.94] transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1E63D6] rounded-sm cursor-pointer"
+            aria-label="alex.dev home"
+          >
+            <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+              {!prefersReduced && (
+                <motion.span
+                  aria-hidden="true"
+                  className="absolute inline-flex h-full w-full rounded-full bg-[#EF4E5E]"
+                  animate={{ scale: [1, 1.9, 1], opacity: [0.65, 0, 0.65] }}
+                  transition={{
+                    duration: 2.4,
+                    repeat: Infinity,
+                    ease: 'easeInOut'
+                  }}
+                />
+              )}
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-[#EF4E5E]" />
+            </span>
+            <span className="font-paper-mono text-[13.5px] font-semibold text-[#0F172A]">
+              alex.dev
+            </span>
+          </a>
+          {breadcrumb && (
+            <>
+              <span
                 aria-hidden="true"
-                className="absolute inline-flex h-full w-full rounded-full bg-[#EF4E5E]"
-                animate={{ scale: [1, 1.9, 1], opacity: [0.65, 0, 0.65] }}
-                transition={{
-                  duration: 2.4,
-                  repeat: Infinity,
-                  ease: 'easeInOut'
-                }}
-              />
-            )}
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#EF4E5E]" />
-          </span>
-          <span className="font-paper-mono text-[13.5px] font-semibold text-[#0F172A]">
-            alex.dev
-          </span>
-        </a>
+                className="font-paper-mono text-[12.5px] text-[#786858]/55 select-none"
+              >
+                /
+              </span>
+              <span className="font-paper-mono text-[12.5px] font-medium text-[#1E63D6] select-none">
+                {breadcrumb}
+              </span>
+            </>
+          )}
+        </div>
 
         <div
-          className="font-paper-mono tabular-nums text-[13px] tracking-wide text-[#786858] select-none whitespace-nowrap shrink-0"
+          className="pointer-events-auto font-paper-mono tabular-nums text-[13px] tracking-wide text-[#786858] select-none whitespace-nowrap shrink-0"
           aria-label={`Local time ${time.hours}:${time.minutes}`}
         >
           <span>{time.hours}</span>

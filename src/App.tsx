@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { Topbar } from './components/Topbar';
 import { FishToBirdsBio, FishToBirdsHandle } from './components/FishToBirdsBio';
@@ -12,6 +12,8 @@ import { ProjectsSection } from './components/ProjectsSection';
 import { ExperienceSection } from './components/ExperienceSection';
 import { SignOffFooter } from './components/SignOffFooter';
 import { NodeModal, ProjectModal, ResumeModal } from './components/Modals';
+import { CreativeCodingArchive } from './components/CreativeCodingArchive';
+import { SkillsArchive } from './components/SkillsArchive';
 import { RevealSection } from './components/RevealSection';
 import {
   AnimatedArrowUpRightIcon,
@@ -19,6 +21,18 @@ import {
   AnimatedFishIcon
 } from './components/AnimatedIcons';
 import { ArcNode, HERO_BIO_TEXT, PortfolioProject } from './data/portfolio';
+
+function hasCreativeCodingHash(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hash;
+  return h.startsWith('#creative-coding') || h.startsWith('#story=');
+}
+
+function hasSkillsHash(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hash;
+  return h.startsWith('#skills') || h.startsWith('#skill=');
+}
 
 export default function App() {
   const bioRef = useRef<FishToBirdsHandle>(null);
@@ -32,6 +46,19 @@ export default function App() {
   const [selectedProject, setSelectedProject] =
     useState<PortfolioProject | null>(null);
   const [selectedNode, setSelectedNode] = useState<ArcNode | null>(null);
+  const [creativeCodingOpen, setCreativeCodingOpen] = useState(
+    hasCreativeCodingHash
+  );
+  const [skillsOpen, setSkillsOpen] = useState(hasSkillsHash);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setCreativeCodingOpen(hasCreativeCodingHash());
+      setSkillsOpen(hasSkillsHash());
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const handleSelectArcNode = (node: ArcNode) => {
     if (node.id === 'experience') {
@@ -40,6 +67,14 @@ export default function App() {
         el.scrollIntoView({ behavior: prefersReduced ? 'auto' : 'smooth' });
         return;
       }
+    }
+    if (node.id === 'creative-coding') {
+      setCreativeCodingOpen(true);
+      return;
+    }
+    if (node.id === 'ai-style-skill') {
+      setSkillsOpen(true);
+      return;
     }
     setSelectedNode(node);
   };
@@ -164,7 +199,10 @@ export default function App() {
 
           {/* Hero Right: IP sticker and 3 clickable nodes along the upper arc */}
           <div>
-            <HeroStage onSelectNode={handleSelectArcNode} />
+            <HeroStage
+              onSelectNode={handleSelectArcNode}
+              onStickerTap={() => bioRef.current?.triggerSwim()}
+            />
           </div>
         </section>
 
@@ -191,6 +229,14 @@ export default function App() {
       <NodeModal
         node={selectedNode}
         onClose={() => setSelectedNode(null)}
+      />
+      <CreativeCodingArchive
+        open={creativeCodingOpen}
+        onClose={() => setCreativeCodingOpen(false)}
+      />
+      <SkillsArchive
+        open={skillsOpen}
+        onClose={() => setSkillsOpen(false)}
       />
     </div>
   );
