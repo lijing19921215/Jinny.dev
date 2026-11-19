@@ -1,3 +1,6 @@
+import arcMotionImg from '../assets/images/arc-motion.jpg';
+import arcWorkImg from '../assets/images/arc-work.jpg';
+
 export type SkillKind = 'visual' | 'workflow';
 export type SkillCategory = 'portrait' | 'workflow';
 
@@ -15,16 +18,18 @@ export interface PortfolioSkill {
   taglineCn: string;
   category: SkillCategory;
   categoryTitleCn: string;
-  categoryEn: string;
   kind: SkillKind;
   kindLabel: string;
-  outputTag: string;
   title: string;
   subtitle: string;
+  deskObjectLabel: string;
+  previewImage?: string;
+  previewAlt?: string;
+  mediumNote: string;
+  aspectNote: string;
   constraints: SkillConstraint[];
   recipeMarkdown: string;
   promptTemplate: string;
-  usageSnippet: string;
   workflowDiff?: {
     inputLabel: string;
     inputText: string;
@@ -43,28 +48,31 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     taglineCn: '人像照片转立体手作羊毛针绒玩偶',
     category: 'portrait',
     categoryTitleCn: '人像与艺术转绘',
-    categoryEn: 'Portrait & Avatar Art',
     kind: 'visual',
     kindLabel: 'Visual Style Skill',
-    outputTag: 'WOOL FELT · SKILL',
     title: 'Wool Felt Craft',
     subtitle:
-      'Transforms crisp photos and characters into tactile needle-felted wool miniatures with warm subsurface fuzz and gentle studio bounce light.',
+      '将人像与角色转化为具有真实羊毛纤维触感的手作针毡玩偶，保留神态轮廓的同时柔化硬边缘与塑料高光。',
+    deskObjectLabel: '羊毛毡相框',
+    previewImage: arcMotionImg,
+    previewAlt: 'Needle-felted wool miniature portrait against cobalt backdrop',
+    mediumNote: 'Needle-felted wool · Cobalt studio backdrop',
+    aspectNote: 'Hover artwork to inspect wool fiber details at 2.2x',
     constraints: [
       {
-        label: 'Preserve silhouette',
+        label: '保留神态特征',
         detail:
-          'Simplify fine micro-textures into soft felted volume without losing key identity traits.'
+          '简化写实皮肤纹理为柔和的羊毛团块体积，但保留发丝分线、唇形与眼神焦点。'
       },
       {
-        label: 'Fiber halo',
+        label: '边缘微绒光晕',
         detail:
-          'Add delicate stray wool hairs along warm rim highlights for physical materiality.'
+          '在肩颈与发丝逆光处保留 1–2px 细腻杂乱羊毛绒毛，强化真实物理材质感。'
       },
       {
-        label: 'Zero harsh blacks',
+        label: '零塑料反光',
         detail:
-          'Lift deep shadows into warm charcoal-espresso tones so surfaces stay plush and matte.'
+          '压低高光锐度并将最深阴影抬升至暖深棕，保证画面呈哑光织物温度。'
       }
     ],
     recipeMarkdown: `---
@@ -75,17 +83,11 @@ medium: needle-felted wool miniature
 
 ## Core Invariants
 - Soften hard edges into matte carded wool fibers (0% glossy plastic)
-- Warm tabletop overhead key light + ivory paper studio backdrop
+- Warm tabletop overhead key light + solid cobalt or ivory studio backdrop
 - Preserve original pose, focal expression & primary color balance
-- Rim fuzz: subtle 1–2px stray wool wisps around silhouettes`,
-    promptTemplate: `Restyle the input image as a handmade needle-felted wool miniature sculpture.
-Render tactile fuzzy wool fibers, delicate stray wisps along silhouette edges, rounded plush volumes, soft shadow falloff, and warm overhead tabletop lighting against a calm cream paper backdrop.`,
-    usageSnippet: `# Invoke in AI agent / image pipeline
-/skill wool-felt-craft --input ./photo.png
-
-# Showroom Live Bench
-Drop any PNG / JPG onto the left frame
-to preview the tactile wool & tonal pass.`
+- Rim fuzz: subtle stray wool wisps around silhouettes`,
+    promptTemplate: `Restyle the input portrait as a handmade needle-felted wool miniature sculpture.
+Render tactile fuzzy wool fibers, delicate stray wisps along silhouette edges, rounded plush volumes, soft blush on cheeks and nose, and warm diffused studio lighting against a clean deep cobalt blue backdrop.`
   },
   {
     id: 'pastel-doll',
@@ -96,28 +98,31 @@ to preview the tactile wool & tonal pass.`
     taglineCn: '人像照片转柔焦陶瓷 bisque 粉彩手办',
     category: 'portrait',
     categoryTitleCn: '人像与艺术转绘',
-    categoryEn: 'Portrait & Avatar Art',
     kind: 'visual',
     kindLabel: 'Visual Style Skill',
-    outputTag: 'PASTEL DOLL · SKILL',
     title: 'Pastel Doll Portrait',
     subtitle:
-      'Reimagines portraits and objects in a dreamy bisque-pastel figurine aesthetic—powdery peach blush, airy highlights, and creamy low-contrast harmony.',
+      '为写实肖像注入素烧瓷偶与粉彩画的柔焦呼吸感——清透蓝灰瞳孔、鼻尖微晕桃红、低对比奶油质感。',
+    deskObjectLabel: '粉彩娃娃立牌',
+    previewImage: arcWorkImg,
+    previewAlt: 'Bisque pastel doll portrait with luminous blue eyes and peach blush',
+    mediumNote: 'Matte bisque porcelain · Soft chalk pastel',
+    aspectNote: 'Hover artwork to inspect powdery blush shading at 2.2x',
     constraints: [
       {
-        label: 'Powdery matte finish',
+        label: '粉雾哑光肌理',
         detail:
-          'Porcelain-chalk softness with warm coral-pink cheek and nose blush.'
+          '用细腻素描纸粒与素烧瓷质感替代油腻平滑磨皮，脸颊与鼻尖点缀蜜桃粉晕染。'
       },
       {
-        label: 'Pastel color lock',
+        label: '情绪克制配色',
         detail:
-          'Compress harsh primaries into airy cream, sky-blue, and butter-yellow tones.'
+          '收敛刺眼高饱和色，让发丝墨黑、深衣领与清澈钴蓝眼眸形成沉静反差。'
       },
       {
-        label: 'Gentle catchlights',
+        label: '微光眼神点睛',
         detail:
-          'Keep eyes luminous while maintaining calm, quiet studio restraint.'
+          '眼白与虹膜保留透亮弧光与细长睫毛轮廓，让静止构图依然具备生命力。'
       }
     ],
     recipeMarkdown: `---
@@ -127,18 +132,12 @@ medium: matte bisque & soft pastel chalk
 ---
 
 ## Color Guardrails
-- Lift shadow floor above #3B3330 (no muddy blacks)
-- Infuse +18% rosy warmth across midtone highlights
-- Compress high-frequency noise into powdery matte grain
-- Zero HDR halos or neon rim saturation`,
-    promptTemplate: `Transform the input into a delicate pastel doll figurine portrait.
-Use powdery matte bisque textures, soft peach-coral blush, dreamy lifted shadows, airy pastel color harmony, and gentle diffused studio rim light.`,
-    usageSnippet: `# Invoke in AI agent / image pipeline
-/skill pastel-doll-portrait --input ./portrait.jpg
-
-# Showroom Live Bench
-Upload a portrait or switch samples on the left
-to inspect the pastel tone curve in Split view.`
+- Keep porcelain ivory skin smooth yet finely textured like pastel paper
+- Infuse soft peach-coral blush across cheekbones and bridge of nose
+- Luminous cobalt-blue iris catchlights with delicate upper lash strokes
+- Zero harsh HDR contrast or neon rim saturation`,
+    promptTemplate: `Transform the input portrait into a delicate bisque pastel doll illustration.
+Use matte pastel-paper textures, luminous blue eyes with soft catchlights, subtle peach-coral blush on cheeks and nose tip, fine stray hair strands, and quiet editorial contrast.`
   },
   {
     id: 'design-restraint',
@@ -149,28 +148,29 @@ to inspect the pastel tone curve in Split view.`
     taglineCn: '自然语言需求转确定性设计规范与 Token',
     category: 'workflow',
     categoryTitleCn: '工程与工作流助手',
-    categoryEn: 'Workflow & Engineering',
     kind: 'workflow',
     kindLabel: 'Workflow Engineering Skill',
-    outputTag: 'WORKFLOW · DIFF',
     title: 'Design Restraint Audit',
     subtitle:
-      'Engineering workflow skill: enforces warm editorial color tokens, spring curves, and anti-slop discipline across frontend components.',
+      '工作流工程 Skill：在 AI 编写前端界面前自动拦截暗黑渐变、胶囊徽章堆砌与线性生硬动效，映射为暖纸编辑部规范。',
+    deskObjectLabel: '桌面笔记本工作台',
+    mediumNote: 'Engineering Workflow · Deterministic Design Tokens',
+    aspectNote: 'Before / After deterministic specification diff',
     constraints: [
       {
-        label: 'Same bench, zero drift',
+        label: '拒绝同质模板',
         detail:
-          'Non-visual skills swap the image scrubber into a structured Input → Output diff.'
+          '自动识别并拒绝深色霓虹渐变、三栏 Bento 仪表盘与装饰性圆角状态标签。'
       },
       {
-        label: 'Deterministic tokens',
+        label: '统一色彩与字体',
         detail:
-          'Rejects dark-mode drift, neon gradients, and decorative pill clutter.'
+          '强制收敛至 #FEFCF8 暖纸白基底，搭配 Space Grotesk 与 Paper Mono 等宽系统。'
       },
       {
-        label: 'Portable SKILL.md',
+        label: '真实物理动效',
         detail:
-          'Copy or download directly into coding agents and design-review pipelines.'
+          '将生硬的线性 CSS transition 替换为带阻尼回弹的物理弹簧曲线。'
       }
     ],
     recipeMarkdown: `---
@@ -180,38 +180,32 @@ category: engineering-workflow
 ---
 
 ## Hard Rejections
-- NO dark mode toggles or slate background flips
+- NO unsolicited dark mode toggles or slate background flips
 - NO generic 3-column Bento box dashboards
 - NO linear CSS transitions on tactile controls
 - Enforce #FEFCF8 canvas + Space Grotesk / Paper Mono pairing`,
     promptTemplate: `Audit the proposed UI specification against design.md invariants.
 Replace arbitrary colors with Warm Editorial Triad tokens (#FEFCF8, #1E63D6, #FCE055, #EF4E5E) and convert linear timing into damped spring physics.`,
-    usageSnippet: `# Attach to code review or frontend agent
-/skill design-restraint-audit ./src/components
-
-# Output Contract
-Produces deterministic token mappings and
-spring curve replacements without layout bloat.`,
     workflowDiff: {
-      inputLabel: 'RAW INPUT — Unstructured UI Prompt',
+      inputLabel: 'Raw Prompt — Unstructured UI Request',
       inputText:
         'Build a dark-mode SaaS analytics dashboard card with purple AI gradients, 3 floating pill status badges, and linear spin loaders.',
-      outputLabel: 'DETERMINISTIC OUTPUT — Applied `design-restraint` Skill',
+      outputLabel: 'Deterministic Output — Applied Design Restraint Skill',
       outputLines: [
         {
-          text: '- Surface: ',
+          text: 'Surface: ',
           highlight: '#FEFCF8',
-          after: ' warm ivory + 1px #E5E7EB hairline (dark mode rejected)'
+          after: ' warm ivory + 1px #E5E7EB hairline (dark drift rejected)'
         },
         {
-          text: '- Typography: ',
+          text: 'Typography: ',
           highlight: 'Space Grotesk',
-          after: ' heading + Paper Mono tabular numerals'
+          after: ' display hierarchy + Paper Mono tabular numbers'
         },
         {
-          text: '- Motion: ',
+          text: 'Motion: ',
           highlight: 'spring(320, 22)',
-          after: ' hover lift; zero decorative pill clutter'
+          after: ' tactile lift; zero decorative pill clutter'
         }
       ]
     }

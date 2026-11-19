@@ -1,354 +1,124 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
-  AnimatePresence,
-  motion,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
-  useTransform,
-  useVelocity
-} from 'motion/react';
-import {
+  ArrowLeft,
+  ArrowRight,
   Check,
   Copy,
   Download,
-  FileCode2,
-  ImagePlus,
-  RotateCcw,
-  Sparkles,
-  Stamp,
-  Trash2,
-  Wand2,
+  ZoomIn,
   X
 } from 'lucide-react';
-import { PORTFOLIO_SKILLS, PortfolioSkill, SkillCategory } from '../data/skills';
-import {
-  createSampleCanvas,
-  renderImageFitCanvas,
-  renderPastelDollStyle,
-  renderWoolFeltStyle,
-  SampleSubjectId
-} from './SkillCanvases';
+import { PORTFOLIO_SKILLS, PortfolioSkill } from '../data/skills';
 import { Topbar } from './Topbar';
-import ipImgSrc from '../assets/images/ip.png';
-import arcMotionImgSrc from '../assets/images/arc-motion.jpg';
 
 interface SkillsArchiveProps {
   open: boolean;
   onClose: () => void;
 }
 
-interface GalleryStamp {
-  uid: string;
-  skillId: string;
-  kind: 'visual' | 'workflow';
-  label: string;
-  tag: string;
-  accent: string;
-  dataUrl?: string;
-  receiptLines?: { key: string; val: string }[];
-  initX: number;
-  initY: number;
-  rotate: number;
-  zIndex: number;
-}
-
-interface SparkleParticle {
+interface FloatingQuip {
   id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  size: number;
+  text: string;
+  xPct: number;
+  yPct: number;
   color: string;
-  shape: 'star' | 'circle' | 'spark';
 }
 
-const SPRING_SNAPPY = { type: 'spring' as const, stiffness: 340, damping: 24 };
-const SPRING_TACTILE = { type: 'spring' as const, stiffness: 240, damping: 20 };
+const SPRING_SNAPPY = { type: 'spring' as const, stiffness: 320, damping: 22 };
+const BRAND_COLORS = ['#EF4E5E', '#1E63D6', '#D97706'];
 
-const SAMPLE_MODELS: {
-  id: SampleSubjectId;
-  label: string;
-  icon: string;
-  swatch: string;
-}[] = [
-  { id: 'berry', label: '草莓女孩', icon: '🍓', swatch: '#EF4E5E' },
-  { id: 'portrait', label: '娃娃人像', icon: '🎀', swatch: '#FCE055' },
-  { id: 'vase', label: '极简静物', icon: '🏺', swatch: '#1E63D6' }
-];
-
-const SKILL_STYLE_META: Record<
-  string,
-  {
-    themeColor: string;
-    noteBg: string;
-    tagBg: string;
-    tagText: string;
-    badgeEmoji: string;
-  }
-> = {
-  'wool-felt': {
-    themeColor: '#EF4E5E',
-    noteBg: '#FFF8E7',
-    tagBg: '#EF4E5E',
-    tagText: '#FFFFFF',
-    badgeEmoji: '🧶'
-  },
-  'pastel-doll': {
-    themeColor: '#FCE055',
-    noteBg: '#EDF5FF',
-    tagBg: '#FCE055',
-    tagText: '#0F172A',
-    badgeEmoji: '🎀'
-  },
-  'design-restraint': {
-    themeColor: '#1E63D6',
-    noteBg: '#F6F5F0',
-    tagBg: '#1E63D6',
-    tagText: '#FFFFFF',
-    badgeEmoji: '📐'
-  }
-};
-
-function parseSkillHash(): number {
-  if (typeof window === 'undefined') return 0;
+function parseInitialSkillSlug(): string | null {
+  if (typeof window === 'undefined') return null;
   const raw = window.location.hash.replace(/^#/, '');
-  if (!raw || raw === 'skills') return 0;
+  if (!raw || raw === 'skills') return null;
   const params = new URLSearchParams(raw);
   const slug = params.get('skill');
-  if (!slug) return 0;
-  const idx = PORTFOLIO_SKILLS.findIndex((s) => s.slug === slug);
-  return idx >= 0 ? idx : 0;
+  if (!slug) return null;
+  return PORTFOLIO_SKILLS.some((s) => s.slug === slug) ? slug : null;
 }
 
-/**
- * Computes exact 45-degree corner peel geometry from top-right (W, 0)
- */
-function computeCornerPeelGeometry(w: number, h: number, peelRatio: number) {
-  const s = Math.max(0, Math.min(1, peelRatio)) * (w + h);
+function playSoftDeskChime(kind: 'music' | 'click') {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
 
-  const remainPts: [number, number][] = [];
-  if (s <= 0.5) {
-    remainPts.push([0, 0], [w, 0], [w, h], [0, h]);
-  } else if (s >= w + h - 0.5) {
-    remainPts.push([0, h]);
-  } else {
-    if (s < w) {
-      remainPts.push([0, 0]);
-      remainPts.push([w - s, 0]);
-    } else {
-      remainPts.push([0, Math.min(h, s - w)]);
-    }
+    const notes =
+      kind === 'music' ? [523.25, 659.25, 783.99, 987.77] : [440, 587.33];
 
-    if (s <= h) {
-      remainPts.push([w, s]);
-      remainPts.push([w, h]);
-    } else {
-      remainPts.push([Math.max(0, w - (s - h)), h]);
-    }
-    remainPts.push([0, h]);
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+      gain.gain.setValueAtTime(0.0001, now + idx * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.035, now + idx * 0.08 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.36);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.08);
+      osc.stop(now + idx * 0.08 + 0.4);
+    });
+
+    window.setTimeout(() => {
+      ctx.close().catch(() => undefined);
+    }, 800);
+  } catch {
+    // Ignore audio context restrictions
   }
-
-  const foldA: [number, number] =
-    s <= w ? [w - s, 0] : [0, Math.min(h, s - w)];
-  const foldB: [number, number] =
-    s <= h ? [w, s] : [Math.max(0, w - (s - h)), h];
-
-  const hasCurl = s > 4 && s < w + h - 4;
-  const foldMidX = (foldA[0] + foldB[0]) / 2;
-  const foldMidY = (foldA[1] + foldB[1]) / 2;
-
-  const lipWidth = Math.min(32, Math.max(14, s * 0.26));
-  const dx = foldB[0] - foldA[0];
-  const dy = foldB[1] - foldA[1];
-  const len = Math.hypot(dx, dy) || 1;
-  const nx = dy / len;
-  const ny = -dx / len;
-
-  const ctrlX = foldMidX + nx * lipWidth;
-  const ctrlY = foldMidY + ny * lipWidth;
-
-  const curlPath = hasCurl
-    ? `M ${foldA[0].toFixed(1)} ${foldA[1].toFixed(1)} Q ${ctrlX.toFixed(
-        1
-      )} ${ctrlY.toFixed(1)} ${foldB[0].toFixed(1)} ${foldB[1].toFixed(1)} Z`
-    : '';
-
-  const foldPath = hasCurl
-    ? `M ${foldA[0].toFixed(1)} ${foldA[1].toFixed(1)} L ${foldB[0].toFixed(
-        1
-      )} ${foldB[1].toFixed(1)}`
-    : '';
-
-  const handleX = Math.max(26, Math.min(w - 26, foldMidX + nx * (lipWidth * 0.35)));
-  const handleY = Math.max(18, Math.min(h - 18, foldMidY + ny * (lipWidth * 0.35)));
-
-  const toClipPoly = (pts: [number, number][]) =>
-    pts.length >= 3
-      ? `polygon(${pts
-          .map(([x, y]) => `${x.toFixed(1)}px ${y.toFixed(1)}px`)
-          .join(', ')})`
-      : 'polygon(0px 0px, 0px 0px, 0px 0px)';
-
-  return {
-    remainClipPath: toClipPoly(remainPts),
-    curlPath,
-    foldPath,
-    handlePos: { x: handleX, y: handleY }
-  };
 }
 
-/**
- * Draggable collectible stamp deposited on the desk
- */
-const DraggableDeskExhibit: React.FC<{
-  stamp: GalleryStamp;
-  constraintsRef: React.RefObject<HTMLDivElement | null>;
-  onFocus: (uid: string) => void;
-  onRemove: (uid: string) => void;
-}> = ({ stamp, constraintsRef, onFocus, onRemove }) => {
+const ObjectTooltip: React.FC<{
+  visible: boolean;
+  label: string;
+  sublabel?: string;
+  align?: 'center' | 'left' | 'right';
+  placement?: 'top' | 'bottom';
+}> = ({ visible, label, sublabel, align = 'center', placement = 'top' }) => {
   const prefersReduced = useReducedMotion();
-  const x = useMotionValue(stamp.initX);
-  const y = useMotionValue(stamp.initY);
-  const xVel = useVelocity(x);
-  const tilt = useTransform(xVel, [-1000, 0, 1000], [-10, 0, 10]);
-  const smoothTilt = useSpring(tilt, { stiffness: 300, damping: 24 });
-
-  const handleDownload = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!stamp.dataUrl) return;
-    const a = document.createElement('a');
-    a.href = stamp.dataUrl;
-    a.download = `${stamp.skillId}-gallery.png`;
-    a.click();
-  };
+  const alignClass =
+    align === 'left'
+      ? 'left-0'
+      : align === 'right'
+        ? 'right-0'
+        : 'left-1/2 -translate-x-1/2';
+  const posClass =
+    placement === 'bottom' ? 'top-[calc(100%+8px)]' : '-top-11';
 
   return (
-    <motion.div
-      drag
-      dragConstraints={constraintsRef}
-      dragElastic={0.14}
-      dragMomentum={false}
-      style={{
-        x,
-        y,
-        rotate: prefersReduced ? stamp.rotate : smoothTilt,
-        zIndex: stamp.zIndex
-      }}
-      initial={
-        prefersReduced
-          ? { opacity: 0 }
-          : {
-              opacity: 0,
-              scale: 0.65,
-              y: stamp.initY - 40,
-              rotate: stamp.rotate * 1.8
-            }
-      }
-      animate={{
-        opacity: 1,
-        scale: 1,
-        y: stamp.initY,
-        rotate: stamp.rotate
-      }}
-      exit={prefersReduced ? { opacity: 0 } : { opacity: 0, scale: 0.78 }}
-      transition={SPRING_TACTILE}
-      whileHover={prefersReduced ? undefined : { scale: 1.05, y: stamp.initY - 4 }}
-      whileDrag={prefersReduced ? undefined : { scale: 1.08 }}
-      onPointerDown={() => onFocus(stamp.uid)}
-      className="group pointer-events-auto absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing select-none"
-    >
-      {stamp.kind === 'visual' ? (
-        <div style={{ filter: 'drop-shadow(0 14px 26px rgba(15,23,42,0.18))' }}>
-          <div className="stamp-card-mask relative w-[148px] sm:w-[168px] bg-[#FFFFFF] p-3">
-            <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[2px] border border-[#0F172A]/10 bg-[#F6F5F0]">
-              {stamp.dataUrl && (
-                <img
-                  src={stamp.dataUrl}
-                  alt={stamp.label}
-                  draggable={false}
-                  className="w-full h-full object-cover pointer-events-none"
-                />
-              )}
-            </div>
-            <div className="mt-2 flex items-center justify-between gap-1 px-0.5">
-              <span className="inline-flex items-center gap-1.5 font-paper-mono text-[9.5px] font-semibold text-[#0F172A] truncate">
-                <span
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: stamp.accent }}
-                />
-                {stamp.tag}
-              </span>
-              <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  title="下载展品"
-                  aria-label="下载展品"
-                  className="p-0.5 rounded hover:bg-[#EDF4FF] text-[#374151] hover:text-[#1E63D6] cursor-pointer"
-                >
-                  <Download className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(stamp.uid);
-                  }}
-                  title="取下展品"
-                  aria-label="取下展品"
-                  className="p-0.5 rounded hover:bg-[#FFF2F3] text-[#786858] hover:text-[#EF4E5E] cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="relative w-[172px] bg-[#FEFCF8] border border-[#0F172A]/14 px-3 py-2.5 shadow-[0_14px_26px_rgba(15,23,42,0.18)]">
-          <div
-            aria-hidden="true"
-            className="absolute -top-[4px] left-0 right-0 h-[4px]"
-            style={{
-              backgroundImage:
-                'radial-gradient(circle at 4px 0, transparent 3px, #FEFCF8 3.2px)',
-              backgroundSize: '8px 4px'
-            }}
-          />
-          <div className="flex items-center justify-between pb-1 mb-1 border-b border-dashed border-[#0F172A]/18">
-            <span className="font-paper-mono text-[9.5px] font-semibold text-[#1E63D6]">
-              {stamp.tag}
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={
+            prefersReduced
+              ? { opacity: 0 }
+              : { opacity: 0, y: placement === 'bottom' ? -6 : 6, scale: 0.94 }
+          }
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={
+            prefersReduced
+              ? { opacity: 0 }
+              : { opacity: 0, y: placement === 'bottom' ? -4 : 4, scale: 0.96 }
+          }
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          className={`pointer-events-none absolute ${posClass} ${alignClass} z-40 whitespace-nowrap rounded-[6px] bg-[#FCE055] px-2.5 py-1 text-left shadow-[0_6px_16px_rgba(15,23,42,0.16)] border border-[#0F172A]/12`}
+        >
+          <span className="block font-paper-mono text-[11px] font-semibold leading-tight text-[#0F172A]">
+            {label}
+          </span>
+          {sublabel && (
+            <span className="block font-paper-mono text-[9.5px] leading-tight text-[#0F172A]/75 mt-0.5">
+              {sublabel}
             </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove(stamp.uid);
-              }}
-              aria-label="移除便签"
-              className="p-0.5 text-[#786858] hover:text-[#EF4E5E] cursor-pointer"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="space-y-1 font-paper-mono text-[9.5px] text-[#374151]">
-            {stamp.receiptLines?.map((l, i) => (
-              <div key={i} className="flex items-center justify-between gap-2">
-                <span className="text-[#786858]">{l.key}</span>
-                <span className="bg-[#FCE055]/70 px-1 rounded-[2px] font-semibold text-[#0F172A]">
-                  {l.val}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 pt-1 border-t border-dashed border-[#0F172A]/20 font-paper-mono text-[8.5px] tracking-widest text-[#786858] text-center">
-            SPEC AUDITED · 60FPS
-          </div>
-        </div>
+          )}
+        </motion.div>
       )}
-    </motion.div>
+    </AnimatePresence>
   );
 };
 
@@ -358,151 +128,37 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
 }) => {
   const prefersReduced = useReducedMotion();
 
-  const [activeSkillIndex, setActiveSkillIndex] = useState<number>(() =>
-    parseSkillHash()
+  // Active skill modal (null = exploring the cozy bedroom & desk)
+  const [activeSkillId, setActiveSkillId] = useState<string | null>(() =>
+    parseInitialSkillSlug()
   );
-  const [activeCategory, setActiveCategory] = useState<SkillCategory>('portrait');
-  const [activeSample, setActiveSample] = useState<SampleSubjectId>('berry');
-  const [uploadedImage, setUploadedImage] = useState<{
-    img: HTMLImageElement;
-    name: string;
-  } | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [hoveredObj, setHoveredObj] = useState<string | null>(null);
 
-  // Peel state: 0.16 = resting teaser curl, 0.52 = half comparison, 1 = fully revealed
-  const [peelRatio, setPeelRatio] = useState<number>(0.16);
-  const [isPeelDragging, setIsPeelDragging] = useState(false);
-  const [cornerHovered, setCornerHovered] = useState(false);
+  // Room atmosphere toggles
+  const [lampOn, setLampOn] = useState(true);
+  const [eveningMode, setEveningMode] = useState(false);
 
-  // Stamped exhibits on desk
-  const [stamps, setStamps] = useState<GalleryStamp[]>([]);
-  const topZRef = useRef(28);
+  // Tactile easter-egg animation counters
+  const [tapCounts, setTapCounts] = useState<Record<string, number>>({});
+  const [quips, setQuips] = useState<FloatingQuip[]>([]);
+  const quipIdRef = useRef(0);
 
-  // Sparkle burst particles
-  const [particles, setParticles] = useState<SparkleParticle[]>([]);
-  const particleIdRef = useRef(0);
-
-  // Note popover (SKILL.md & prompt)
-  const [noteOpen, setNoteOpen] = useState(false);
+  // Specimen modal controls
   const [recipeTab, setRecipeTab] = useState<'rules' | 'prompt'>('rules');
   const [copiedCode, setCopiedCode] = useState(false);
+  const [loupePos, setLoupePos] = useState<{
+    active: boolean;
+    xPct: number;
+    yPct: number;
+  }>({ active: false, xPct: 50, yPct: 50 });
 
-  // Preloaded sample images
-  const [loadedSamples, setLoadedSamples] = useState<{
-    berry: HTMLImageElement | null;
-    portrait: HTMLImageElement | null;
-  }>({ berry: null, portrait: null });
+  const activeSkillIndex = activeSkillId
+    ? PORTFOLIO_SKILLS.findIndex((s) => s.id === activeSkillId)
+    : -1;
+  const activeSkill: PortfolioSkill | null =
+    activeSkillIndex >= 0 ? PORTFOLIO_SKILLS[activeSkillIndex] : null;
 
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const cardRef = useRef<HTMLDivElement | null>(null);
-  const beforeCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const afterCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const peelDraggingRef = useRef(false);
-  const peelMovedRef = useRef(false);
-
-  const [cardSize, setCardSize] = useState<{ w: number; h: number }>({
-    w: 480,
-    h: 300
-  });
-
-  const currentSkill: PortfolioSkill =
-    PORTFOLIO_SKILLS[activeSkillIndex] ?? PORTFOLIO_SKILLS[0];
-  const isVisualSkill = currentSkill.kind === 'visual';
-  const currentMeta =
-    SKILL_STYLE_META[currentSkill.id] ?? SKILL_STYLE_META['wool-felt'];
-
-  // Keep active category in sync with current skill
-  useEffect(() => {
-    setActiveCategory(currentSkill.category);
-  }, [currentSkill.category]);
-
-  // Preload sample image elements
-  useEffect(() => {
-    let active = true;
-    const berryImg = new Image();
-    berryImg.onload = () => {
-      if (active) setLoadedSamples((prev) => ({ ...prev, berry: berryImg }));
-    };
-    berryImg.src = ipImgSrc;
-
-    const portraitImg = new Image();
-    portraitImg.onload = () => {
-      if (active)
-        setLoadedSamples((prev) => ({ ...prev, portrait: portraitImg }));
-    };
-    portraitImg.src = arcMotionImgSrc;
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  // Measure centerpiece card accurately
-  useEffect(() => {
-    if (!open) return;
-    const el = cardRef.current;
-    if (!el) return;
-    const updateSize = () => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) {
-        setCardSize((prev) =>
-          Math.abs(prev.w - rect.width) < 1 &&
-          Math.abs(prev.h - rect.height) < 1
-            ? prev
-            : { w: rect.width, h: rect.height }
-        );
-      }
-    };
-    updateSize();
-    const ro = new ResizeObserver(updateSize);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [open]);
-
-  // Render raw & styled canvases
-  useEffect(() => {
-    if (!open || !isVisualSkill) return;
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cw = Math.max(360, Math.round(cardSize.w * dpr));
-    const ch = Math.max(220, Math.round(cardSize.h * dpr));
-
-    const srcCanvas = uploadedImage
-      ? renderImageFitCanvas(uploadedImage.img, cw, ch)
-      : createSampleCanvas(activeSample, cw, ch, loadedSamples);
-
-    const beforeEl = beforeCanvasRef.current;
-    const afterEl = afterCanvasRef.current;
-    if (!beforeEl || !afterEl) return;
-
-    beforeEl.width = cw;
-    beforeEl.height = ch;
-    afterEl.width = cw;
-    afterEl.height = ch;
-
-    const bCtx = beforeEl.getContext('2d');
-    if (bCtx) {
-      bCtx.clearRect(0, 0, cw, ch);
-      bCtx.drawImage(srcCanvas, 0, 0, cw, ch);
-    }
-
-    if (currentSkill.id === 'pastel-doll') {
-      renderPastelDollStyle(srcCanvas, afterEl);
-    } else {
-      renderWoolFeltStyle(srcCanvas, afterEl);
-    }
-  }, [
-    open,
-    isVisualSkill,
-    currentSkill.id,
-    activeSample,
-    uploadedImage,
-    loadedSamples,
-    cardSize
-  ]);
-
-  // Body scroll lock & URL hash sync
+  // Body scroll lock
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -512,51 +168,30 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
     };
   }, [open]);
 
+  // URL hash sync
   useEffect(() => {
     if (!open || typeof window === 'undefined') return;
-    const targetHash = `#skill=${currentSkill.slug}`;
+    const targetHash = activeSkill ? `#skill=${activeSkill.slug}` : '#skills';
     if (window.location.hash !== targetHash) {
       window.history.replaceState(null, '', targetHash);
     }
-  }, [open, currentSkill.slug]);
+  }, [open, activeSkill]);
 
-  // Particle burst generator for transformation delight
-  const triggerSparkleBurst = useCallback((originX?: number, originY?: number) => {
-    if (prefersReduced) return;
-    const rect = cardRef.current?.getBoundingClientRect();
-    const cx = originX ?? (rect ? rect.left + rect.width / 2 : window.innerWidth / 2);
-    const cy = originY ?? (rect ? rect.top + rect.height / 2 : window.innerHeight / 2);
-
-    const colors = ['#EF4E5E', '#1E63D6', '#FCE055', '#4B6B4C'];
-    const shapes: ('star' | 'circle' | 'spark')[] = ['star', 'circle', 'spark'];
-    const count = 14;
-
-    const newParticles: SparkleParticle[] = Array.from({ length: count }, () => {
-      particleIdRef.current += 1;
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 40 + Math.random() * 85;
-      return {
-        id: particleIdRef.current,
-        x: cx,
-        y: cy,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        size: 7 + Math.random() * 8,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        shape: shapes[Math.floor(Math.random() * shapes.length)]
-      };
-    });
-
-    setParticles((prev) => [...prev, ...newParticles]);
-    window.setTimeout(() => {
-      setParticles((prev) =>
-        prev.filter((p) => !newParticles.some((np) => np.id === p.id))
-      );
-    }, 850);
-  }, [prefersReduced]);
+  const spawnQuip = useCallback(
+    (text: string, xPct: number, yPct: number) => {
+      quipIdRef.current += 1;
+      const id = quipIdRef.current;
+      const color = BRAND_COLORS[id % BRAND_COLORS.length];
+      setQuips((prev) => [...prev.slice(-4), { id, text, xPct, yPct, color }]);
+      window.setTimeout(() => {
+        setQuips((prev) => prev.filter((q) => q.id !== id));
+      }, 1500);
+    },
+    []
+  );
 
   const handleCloseWorkspace = useCallback(() => {
-    setNoteOpen(false);
+    setActiveSkillId(null);
     if (
       typeof window !== 'undefined' &&
       (window.location.hash.startsWith('#skills') ||
@@ -571,204 +206,42 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
     onClose();
   }, [onClose]);
 
-  const selectSkill = useCallback((idx: number) => {
-    const wrapped = (idx + PORTFOLIO_SKILLS.length) % PORTFOLIO_SKILLS.length;
-    setActiveSkillIndex(wrapped);
-    setPeelRatio((prev) => (prev < 0.35 ? 0.45 : prev));
+  const navigateSkill = useCallback((dir: -1 | 1) => {
+    if (activeSkillIndex < 0) return;
+    const nextIdx =
+      (activeSkillIndex + dir + PORTFOLIO_SKILLS.length) %
+      PORTFOLIO_SKILLS.length;
+    setActiveSkillId(PORTFOLIO_SKILLS[nextIdx].id);
     setCopiedCode(false);
-    triggerSparkleBurst();
-  }, [triggerSparkleBurst]);
-
-  const switchCategory = (cat: SkillCategory) => {
-    setActiveCategory(cat);
-    const firstInCat = PORTFOLIO_SKILLS.findIndex((s) => s.category === cat);
-    if (firstInCat >= 0) {
-      selectSkill(firstInCat);
-    }
-  };
+    setLoupePos({ active: false, xPct: 50, yPct: 50 });
+  }, [activeSkillIndex]);
 
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (noteOpen) {
-          setNoteOpen(false);
+        if (activeSkillId) {
+          setActiveSkillId(null);
         } else {
           handleCloseWorkspace();
         }
-      } else if (e.key === 'ArrowLeft') {
-        selectSkill(activeSkillIndex - 1);
-      } else if (e.key === 'ArrowRight') {
-        selectSkill(activeSkillIndex + 1);
+      } else if (activeSkillId && e.key === 'ArrowLeft') {
+        navigateSkill(-1);
+      } else if (activeSkillId && e.key === 'ArrowRight') {
+        navigateSkill(1);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, noteOpen, activeSkillIndex, selectSkill, handleCloseWorkspace]);
-
-  // Peel drag interaction
-  const updatePeelFromPointer = useCallback((clientX: number, clientY: number) => {
-    const rect = cardRef.current?.getBoundingClientRect();
-    if (!rect || !rect.width || !rect.height) return;
-    const dx = Math.max(0, rect.right - clientX);
-    const dy = Math.max(0, clientY - rect.top);
-    const ratio = (dx + dy) / (rect.width + rect.height);
-    setPeelRatio(Math.max(0.09, Math.min(1, ratio * 1.15)));
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerMove = (e: PointerEvent) => {
-      if (!peelDraggingRef.current) return;
-      peelMovedRef.current = true;
-      updatePeelFromPointer(e.clientX, e.clientY);
-    };
-    const onPointerUp = () => {
-      if (!peelDraggingRef.current) return;
-      peelDraggingRef.current = false;
-      setIsPeelDragging(false);
-
-      if (!peelMovedRef.current) {
-        setPeelRatio((prev) => (prev < 0.36 ? 0.58 : prev < 0.85 ? 1 : 0.16));
-      } else {
-        setPeelRatio((prev) =>
-          prev > 0.78 ? 1 : prev < 0.14 ? 0.14 : prev
-        );
-      }
-    };
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
-    return () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-    };
-  }, [open, updatePeelFromPointer]);
-
-  const handleLoadUploadedFile = useCallback((file: File | undefined | null) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      setUploadedImage({ img, name: file.name });
-      setPeelRatio(0.58);
-      triggerSparkleBurst();
-      URL.revokeObjectURL(objectUrl);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-    };
-    img.src = objectUrl;
-  }, [triggerSparkleBurst]);
-
-  // Stamp current masterpiece onto desk collection
-  const handleStampExhibit = useCallback(() => {
-    triggerSparkleBurst();
-
-    const count = stamps.length;
-    const isMobile =
-      typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-    const desktopSpots: [number, number, number][] = [
-      [360, -90, 6],
-      [380, 70, -4],
-      [-360, 20, -5],
-      [340, -10, 3],
-      [-350, -110, 5],
-      [-345, 130, -3]
-    ];
-    const [dx, dy, drot] = desktopSpots[count % desktopSpots.length];
-    const initX = isMobile ? (count % 2 === 0 ? 82 : -82) : dx;
-    const initY = isMobile ? -130 + count * 40 : dy;
-    const rotate = isMobile ? (count % 2 === 0 ? 5 : -5) : drot;
-
-    topZRef.current += 1;
-    const uid = `${currentSkill.id}-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 6)}`;
-
-    if (isVisualSkill) {
-      const w = 420;
-      const h = 262;
-      const src = uploadedImage
-        ? renderImageFitCanvas(uploadedImage.img, w, h)
-        : createSampleCanvas(activeSample, w, h, loadedSamples);
-      const dst = document.createElement('canvas');
-      dst.width = w;
-      dst.height = h;
-      if (currentSkill.id === 'pastel-doll') {
-        renderPastelDollStyle(src, dst);
-      } else {
-        renderWoolFeltStyle(src, dst);
-      }
-      const dataUrl = dst.toDataURL('image/png');
-
-      setStamps((prev) => [
-        ...prev.slice(-5),
-        {
-          uid,
-          skillId: currentSkill.id,
-          kind: 'visual',
-          label: currentSkill.title,
-          tag: currentSkill.shortCn,
-          accent: currentMeta.themeColor,
-          dataUrl,
-          initX,
-          initY,
-          rotate,
-          zIndex: topZRef.current
-        }
-      ]);
-      setPeelRatio((prev) => (prev < 0.42 ? 0.6 : prev));
-    } else {
-      setStamps((prev) => [
-        ...prev.slice(-5),
-        {
-          uid,
-          skillId: currentSkill.id,
-          kind: 'workflow',
-          label: currentSkill.title,
-          tag: 'SPEC RECEIPT',
-          accent: currentMeta.themeColor,
-          receiptLines: [
-            { key: 'CANVAS', val: '#FEFCF8' },
-            { key: 'TYPE', val: 'Space Grotesk' },
-            { key: 'SPRING', val: '320 / 22' }
-          ],
-          initX,
-          initY,
-          rotate,
-          zIndex: topZRef.current
-        }
-      ]);
-      setPeelRatio(1);
-    }
-  }, [
-    triggerSparkleBurst,
-    stamps.length,
-    currentSkill.id,
-    currentSkill.title,
-    currentSkill.shortCn,
-    isVisualSkill,
-    uploadedImage,
-    activeSample,
-    loadedSamples,
-    currentMeta.themeColor
-  ]);
-
-  const handleDownloadArtwork = () => {
-    const el = afterCanvasRef.current;
-    if (!el) return;
-    const a = document.createElement('a');
-    a.href = el.toDataURL('image/png');
-    a.download = `${currentSkill.slug}-${uploadedImage ? 'custom' : activeSample}.png`;
-    a.click();
-  };
+  }, [open, activeSkillId, navigateSkill, handleCloseWorkspace]);
 
   const handleCopyRecipe = async () => {
+    if (!activeSkill) return;
     const txt =
       recipeTab === 'rules'
-        ? currentSkill.recipeMarkdown
-        : currentSkill.promptTemplate;
+        ? activeSkill.recipeMarkdown
+        : activeSkill.promptTemplate;
     try {
       await navigator.clipboard.writeText(txt);
       setCopiedCode(true);
@@ -779,22 +252,23 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
   };
 
   const handleDownloadSkillMd = () => {
-    const blob = new Blob([currentSkill.recipeMarkdown], {
+    if (!activeSkill) return;
+    const blob = new Blob([activeSkill.recipeMarkdown], {
       type: 'text/markdown;charset=utf-8'
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${currentSkill.slug}-SKILL.md`;
+    a.download = `${activeSkill.slug}-SKILL.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const effectivePeel = cornerHovered && peelRatio < 0.22 ? 0.26 : peelRatio;
-  const peelGeom = useMemo(
-    () => computeCornerPeelGeometry(cardSize.w, cardSize.h, effectivePeel),
-    [cardSize.w, cardSize.h, effectivePeel]
-  );
+  const handleOpenSkill = (skillId: string) => {
+    setCopiedCode(false);
+    setLoupePos({ active: false, xPct: 50, yPct: 50 });
+    setActiveSkillId(skillId);
+  };
 
   return (
     <AnimatePresence>
@@ -802,7 +276,7 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
         <motion.div
           role="dialog"
           aria-modal="true"
-          aria-label="Skills Interactive Studio"
+          aria-label="Cozy Bedroom & Skills Desk"
           initial={prefersReduced ? { opacity: 0 } : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={prefersReduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
@@ -811,692 +285,962 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
               ? { duration: 0.12 }
               : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
           }
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
-          onDragLeave={(e) => {
-            if (e.currentTarget === e.target) setIsDragOver(false);
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragOver(false);
-            handleLoadUploadedFile(e.dataTransfer.files?.[0]);
-          }}
-          className="fixed inset-0 z-50 flex flex-col overflow-hidden dot-grid-paper text-[#0F172A]"
+          className={`fixed inset-0 z-50 flex flex-col overflow-hidden transition-colors duration-700 ${
+            eveningMode ? 'bg-[#FAF4E8]' : 'bg-[#FEFCF8]'
+          } text-[#0F172A]`}
         >
-          {/* Topbar */}
+          {/* Subtle paper grain overlay */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 paper-grain opacity-80"
+          />
+
+          {/* Shared Topbar */}
           <Topbar
             onBrandClick={handleCloseWorkspace}
             breadcrumb="skills"
-            className="relative z-40 w-full pt-6 pb-2 sm:pt-8 sm:pb-2.5 pointer-events-none no-print shrink-0"
+            className="relative z-40 w-full pt-6 pb-2 sm:pt-8 sm:pb-2 pointer-events-none no-print shrink-0"
           />
 
-          {/* SPARKLE BURST PARTICLES */}
-          <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
-            <AnimatePresence>
-              {particles.map((p) => (
-                <motion.div
-                  key={p.id}
-                  initial={{ opacity: 1, x: p.x, y: p.y, scale: 0.2 }}
-                  animate={{
-                    opacity: 0,
-                    x: p.x + p.vx,
-                    y: p.y + p.vy + 20,
-                    scale: 1,
-                    rotate: p.vx * 2
-                  }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
-                  style={{
-                    position: 'absolute',
-                    width: p.size,
-                    height: p.size,
-                    color: p.color
-                  }}
-                >
-                  {p.shape === 'star' ? (
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
-                      <path d="M12 0L14.8 9.2L24 12L14.8 14.8L12 24L9.2 14.8L0 12L9.2 9.2Z" />
-                    </svg>
-                  ) : p.shape === 'spark' ? (
-                    <div className="w-full h-full rotate-45 border border-current rounded-sm" />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-current opacity-85" />
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          {/* AIRY STUDIO BENCH */}
-          <div
-            ref={stageRef}
-            className="relative flex-1 w-full flex flex-col items-center justify-center px-4 pb-28 pt-1 overflow-hidden"
+          {/* FULL-BLEED COZY STUDIO ROOM PLACEHOLDER LAYOUT (100% BELOW TOPBAR) */}
+          <main
+            style={{ containerType: 'size' }}
+            className="relative z-10 flex-1 w-full flex items-center justify-center overflow-hidden"
           >
-            {/* AMBIENT WHIMSICAL DOODLES (Inspired by user's references) */}
-            <motion.div
-              aria-hidden="true"
-              animate={prefersReduced ? undefined : { y: [-3, 3, -3], rotate: [-2, 3, -2] }}
-              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-              className="pointer-events-none hidden md:block absolute left-[15%] top-[14%] text-[#1E63D6]/45 select-none"
+            {/* Proportional 960x580 Room Stage with Seamless Wall & Wood Floor Extension */}
+            <div
+              style={{
+                containerType: 'inline-size',
+                width: 'min(100cqw, 1260px, calc(100cqh * 960 / 580))',
+                aspectRatio: '960 / 580'
+              }}
+              className="relative select-none"
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 1L14.6 9.4L23 12L14.6 14.6L12 23L9.4 14.6L1 12L9.4 9.4Z" />
-              </svg>
-            </motion.div>
-            <motion.div
-              aria-hidden="true"
-              animate={prefersReduced ? undefined : { y: [4, -4, 4], rotate: [3, -3, 3] }}
-              transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-              className="pointer-events-none hidden md:block absolute right-[13%] bottom-[22%] text-[#EF4E5E]/45 select-none"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-              </svg>
-            </motion.div>
-
-            {/* FLOATING ARTISAN'S MEMO (Skill Identity & Recipe Teaser) */}
-            <motion.div
-              drag
-              dragConstraints={stageRef}
-              dragElastic={0.12}
-              dragMomentum={false}
-              initial={prefersReduced ? false : { opacity: 0, x: -20, rotate: -4 }}
-              animate={{ opacity: 1, x: 0, rotate: -2 }}
-              transition={SPRING_SNAPPY}
-              whileHover={prefersReduced ? undefined : { scale: 1.03, rotate: 0 }}
-              style={{ backgroundColor: currentMeta.noteBg }}
-              className="hidden lg:flex flex-col justify-between absolute left-[6%] xl:left-[8%] top-[14%] z-20 w-[184px] p-4 border border-[#0F172A]/10 shadow-[0_14px_28px_rgba(15,23,42,0.10)] cursor-grab active:cursor-grabbing select-none"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-paper-mono text-[10px] font-semibold text-[#786858]">
-                  {currentSkill.indexLabel} // {currentSkill.categoryEn}
-                </span>
-                <span className="text-[13px]">{currentMeta.badgeEmoji}</span>
-              </div>
-              <div className="my-2.5">
-                <h3 className="font-display text-[17px] font-bold tracking-tight text-[#0F172A] leading-snug">
-                  {currentSkill.title}
-                </h3>
-                <p className="font-paper-mono text-[10px] leading-relaxed text-[#374151]/90 mt-1.5">
-                  {currentSkill.taglineCn}
-                </p>
-                <div className="mt-2 pt-2 border-t border-dashed border-[#0F172A]/12">
-                  <span className="font-paper-mono text-[9px] text-[#786858]">
-                    核心原则：{currentSkill.constraints[0]?.label}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between font-paper-mono text-[9px] text-[#786858]">
-                <span>可拖拽便签</span>
-                <button
-                  type="button"
-                  onClick={() => setNoteOpen(true)}
-                  className="text-[#1E63D6] hover:underline cursor-pointer"
+              <div className="relative w-full h-full">
+                {/* 1. Seamless Full-Bleed Wall & Warm Hardwood Floor Backdrop */}
+                <svg
+                  viewBox="0 0 960 580"
+                  className="w-full h-full block overflow-visible"
+                  aria-hidden="true"
                 >
-                  看咒语 ↗
-                </button>
-              </div>
-            </motion.div>
+                  <defs>
+                    <linearGradient id="wallBgGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="0%"
+                        stopColor={eveningMode ? '#F9EFDC' : '#FEFCF8'}
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor={eveningMode ? '#F3E5CA' : '#F8F4EB'}
+                      />
+                    </linearGradient>
+                    <radialGradient id="floorLampGlow" cx="50%" cy="22%" r="68%">
+                      <stop offset="0%" stopColor="#FCE055" stopOpacity="0.45" />
+                      <stop offset="55%" stopColor="#FCE055" stopOpacity="0.14" />
+                      <stop offset="100%" stopColor="#FCE055" stopOpacity="0" />
+                    </radialGradient>
+                  </defs>
 
-            {/* COLLECTIBLE EXHIBITS EJECTED TO DESK */}
-            <div className="pointer-events-none absolute inset-0 z-25">
-              <AnimatePresence>
-                {stamps.map((stamp) => (
-                  <DraggableDeskExhibit
-                    key={stamp.uid}
-                    stamp={stamp}
-                    constraintsRef={stageRef}
-                    onFocus={(uid) => {
-                      topZRef.current += 1;
-                      setStamps((prev) =>
-                        prev.map((s) =>
-                          s.uid === uid ? { ...s, zIndex: topZRef.current } : s
-                        )
-                      );
-                    }}
-                    onRemove={(uid) =>
-                      setStamps((prev) => prev.filter((s) => s.uid !== uid))
-                    }
+                  {/* Wall Plane (Top ~73%) */}
+                  <rect
+                    x="-1200"
+                    y="-1200"
+                    width="3360"
+                    height="1624"
+                    fill="url(#wallBgGrad)"
                   />
-                ))}
-              </AnimatePresence>
-            </div>
+                  {/* Horizon Baseboard Line */}
+                  <line
+                    x1="-1200"
+                    y1="424"
+                    x2="2160"
+                    y2="424"
+                    stroke="#D6C7B4"
+                    strokeWidth="2"
+                  />
+                  {/* Warm Hardwood Floor Plane (Bottom ~27%) */}
+                  <rect
+                    x="-1200"
+                    y="424"
+                    width="3360"
+                    height="1600"
+                    fill={eveningMode ? '#DFCBB2' : '#EADBC8'}
+                  />
+                  {/* Subtle Wood Plank Lines */}
+                  <line x1="-1200" y1="458" x2="2160" y2="458" stroke="#D9C6AF" strokeWidth="1" />
+                  <line x1="-1200" y1="496" x2="2160" y2="496" stroke="#D9C6AF" strokeWidth="1" />
+                  <line x1="-1200" y1="538" x2="2160" y2="538" stroke="#D9C6AF" strokeWidth="1" />
 
-            {/* CENTERPIECE: TYPOGRAPHY + SCALLOPED CANVASES + INPUT TRAY */}
-            <div className="relative z-10 flex flex-col items-center w-full max-w-[500px]">
-              {/* CLEAR HEADER & CATEGORY SEGMENT */}
-              <div className="text-center mb-3 sm:mb-4 select-none flex flex-col items-center">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFFFFF] border border-[#0F172A]/8 shadow-sm font-paper-mono text-[11px] mb-2">
-                  <button
-                    type="button"
-                    onClick={() => switchCategory('portrait')}
-                    className={`px-2.5 py-0.5 rounded-full transition-colors cursor-pointer ${
-                      activeCategory === 'portrait'
-                        ? 'bg-[#1E63D6] text-white font-semibold'
-                        : 'text-[#786858] hover:text-[#0F172A]'
-                    }`}
-                  >
-                    🎨 人像转绘 (2)
-                  </button>
-                  <span className="text-[#E5E7EB]">|</span>
-                  <button
-                    type="button"
-                    onClick={() => switchCategory('workflow')}
-                    className={`px-2.5 py-0.5 rounded-full transition-colors cursor-pointer ${
-                      activeCategory === 'workflow'
-                        ? 'bg-[#1E63D6] text-white font-semibold'
-                        : 'text-[#786858] hover:text-[#0F172A]'
-                    }`}
-                  >
-                    ⚡ 工作流提效 (1)
-                  </button>
+                  {/* Floor Lamp Warm Light Pool */}
+                  {lampOn && (
+                    <ellipse
+                      cx="285"
+                      cy="290"
+                      rx="165"
+                      ry="175"
+                      fill="url(#floorLampGlow)"
+                    />
+                  )}
+                </svg>
+
+                {/* ============================================================
+                    2. PLACEHOLDER LAYOUT LAYER (MATCHING REFERENCE COMPOSITION)
+                   ============================================================ */}
+
+                {/* --- UPPER-LEFT GALLERY WALL CLUSTER --- */}
+
+                {/* P1. Small Square Still-Life Frame (Far Top-Left) */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.frame1 ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, frame1: count }));
+                    spawnQuip('still life · sketch', 6, 4);
+                  }}
+                  onMouseEnter={() => setHoveredObj('frame1')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -2, scale: 1.03 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.96 }}
+                  aria-label="小挂画占位 1"
+                  style={{ left: '2.8%', top: '4.5%', width: '6.2%', height: '10.2%' }}
+                  className={`absolute ${hoveredObj === 'frame1' ? 'z-40' : 'z-15'} cursor-pointer rounded-[0.6cqw] border-[0.16cqw] border-dashed border-[#6E5644]/55 bg-[#FFFFFF]/80 flex items-center justify-center p-[0.4cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'frame1'} label="静物小挂画" sublabel="画框占位块" align="left" placement="bottom" />
+                  <span className="font-paper-mono text-[0.95cqw] leading-tight text-[#786858] text-center">
+                    小挂画 1
+                  </span>
+                </motion.button>
+
+                {/* S1. CORE SKILL 01 — Gallery Portrait Frame (Top-Left Hero) */}
+                <motion.button
+                  type="button"
+                  onClick={() => handleOpenSkill('wool-felt')}
+                  onMouseEnter={() => setHoveredObj('wool-felt')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -4, scale: 1.04 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.96 }}
+                  transition={SPRING_SNAPPY}
+                  aria-label="探索 01 Wool Felt 毛毡风 Skill"
+                  style={{ left: '10.8%', top: '5.5%', width: '8.2%', height: '13.5%' }}
+                  className={`absolute ${hoveredObj === 'wool-felt' ? 'z-40' : 'z-20'} cursor-pointer rounded-[0.7cqw] border-[0.2cqw] border-[#1E63D6] bg-[#EDF4FF] shadow-[0_6px_14px_rgba(30,99,214,0.12)] flex flex-col items-center justify-center gap-[0.3cqw] p-[0.5cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip
+                    visible={hoveredObj === 'wool-felt'}
+                    label="01 · Wool Felt 毛毡风"
+                    sublabel="点击查看成品与配方"
+                    placement="bottom"
+                  />
+                  <span className="font-paper-mono text-[0.95cqw] font-semibold text-[#1E63D6] leading-none">
+                    SKILL 01
+                  </span>
+                  <span className="font-paper-mono text-[1.05cqw] font-medium text-[#0F172A] leading-tight text-center">
+                    毛毡挂画
+                  </span>
+                </motion.button>
+
+                {/* P2. Round Floral Wall Clock */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.clock ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, clock: count }));
+                    playSoftDeskChime('click');
+                    spawnQuip('tick tock ♪', 7, 17);
+                  }}
+                  onMouseEnter={() => setHoveredObj('clock')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { rotate: 6, scale: 1.04 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.95 }}
+                  aria-label="圆形挂钟占位"
+                  style={{ left: '3.2%', top: '19.5%', width: '7.2%', height: '12%' }}
+                  className={`absolute ${hoveredObj === 'clock' ? 'z-40' : 'z-15'} cursor-pointer rounded-full border-[0.16cqw] border-dashed border-[#6E5644]/60 bg-[#FFFFFF]/85 flex items-center justify-center p-[0.4cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'clock'} label="圆形墙挂钟" sublabel="钟表占位块" align="left" />
+                  <span className="font-paper-mono text-[0.95cqw] text-[#786858] text-center leading-tight">
+                    挂钟
+                  </span>
+                </motion.button>
+
+                {/* S2. CORE SKILL 02 — Gallery Frame 02 (Lower-Right of Cluster) */}
+                <motion.button
+                  type="button"
+                  onClick={() => handleOpenSkill('pastel-doll')}
+                  onMouseEnter={() => setHoveredObj('pastel-doll')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -4, scale: 1.04 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.96 }}
+                  transition={SPRING_SNAPPY}
+                  aria-label="探索 02 Pastel Doll 粉彩娃娃风 Skill"
+                  style={{ left: '12.5%', top: '21.8%', width: '8.5%', height: '13%' }}
+                  className={`absolute ${hoveredObj === 'pastel-doll' ? 'z-40' : 'z-20'} cursor-pointer rounded-[0.7cqw] border-[0.2cqw] border-[#1E63D6] bg-[#FEF9DB] shadow-[0_6px_14px_rgba(30,99,214,0.12)] flex flex-col items-center justify-center gap-[0.3cqw] p-[0.5cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip
+                    visible={hoveredObj === 'pastel-doll'}
+                    label="02 · Pastel Doll 粉彩娃娃"
+                    sublabel="点击查看成品与配方"
+                  />
+                  <span className="font-paper-mono text-[0.95cqw] font-semibold text-[#1E63D6] leading-none">
+                    SKILL 02
+                  </span>
+                  <span className="font-paper-mono text-[1.05cqw] font-medium text-[#0F172A] leading-tight text-center">
+                    粉彩挂画
+                  </span>
+                </motion.button>
+
+                {/* P3. Botanical Sketch Frame (Upper-Right of Cluster) */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.frame3 ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, frame3: count }));
+                    spawnQuip('botanical study ✿', 24, 7);
+                  }}
+                  onMouseEnter={() => setHoveredObj('frame3')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -2, scale: 1.03 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.96 }}
+                  aria-label="植物挂画占位"
+                  style={{ left: '21.5%', top: '7.5%', width: '7.4%', height: '11.2%' }}
+                  className={`absolute ${hoveredObj === 'frame3' ? 'z-40' : 'z-15'} cursor-pointer rounded-[0.6cqw] border-[0.16cqw] border-dashed border-[#6E5644]/55 bg-[#FFFFFF]/80 flex items-center justify-center p-[0.4cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'frame3'} label="植物小挂画" sublabel="画框占位块" placement="bottom" />
+                  <span className="font-paper-mono text-[0.95cqw] leading-tight text-[#786858] text-center">
+                    小挂画 2
+                  </span>
+                </motion.button>
+
+                {/* --- LOWER-LEFT ARMCHAIR + PLUSHIE + DRAPED THROW --- */}
+
+                {/* P4. Cozy Armchair */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.armchair ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, armchair: count }));
+                    spawnQuip('comfy reading spot ~', 14, 38);
+                  }}
+                  onMouseEnter={() => setHoveredObj('armchair')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -3 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.98 }}
+                  aria-label="单人沙发占位"
+                  style={{ left: '2.6%', top: '39.5%', width: '21.5%', height: '38%' }}
+                  className={`absolute ${hoveredObj === 'armchair' ? 'z-40' : 'z-15'} cursor-pointer rounded-[1.8cqw] border-[0.18cqw] border-dashed border-[#6E5644]/60 bg-[#E6ECF2]/80 flex flex-col items-center justify-end pb-[2.2cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'armchair'} label="单人扶手沙发" sublabel="家具占位块" align="left" />
+                  <span className="font-paper-mono text-[1.15cqw] text-[#6E5644] font-medium">
+                    单人沙发
+                  </span>
+                  {/* Placeholder seat legs */}
+                  <span className="absolute -bottom-[1.2cqw] left-[18%] w-[1cqw] h-[1.4cqw] rounded-b bg-[#C4B299] border border-[#6E5644]/50" />
+                  <span className="absolute -bottom-[1.2cqw] right-[18%] w-[1cqw] h-[1.4cqw] rounded-b bg-[#C4B299] border border-[#6E5644]/50" />
+                </motion.button>
+
+                {/* P5. Plush Bunny sitting on Armchair */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.plushie ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, plushie: count }));
+                    spawnQuip('soft bunny 🐇', 11, 50);
+                  }}
+                  onMouseEnter={() => setHoveredObj('plushie')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -3, rotate: -4 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.94 }}
+                  aria-label="玩偶占位"
+                  style={{ left: '7.2%', top: '53%', width: '7.5%', height: '12%' }}
+                  className={`absolute ${hoveredObj === 'plushie' ? 'z-40' : 'z-20'} cursor-pointer rounded-[1cqw] border-[0.16cqw] border-dashed border-[#6E5644]/65 bg-[#F4E7D4]/90 flex items-center justify-center p-[0.3cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'plushie'} label="小兔玩偶" sublabel="点击互动" align="left" />
+                  <span className="font-paper-mono text-[0.95cqw] text-[#6E5644] text-center">
+                    小玩偶
+                  </span>
+                </motion.button>
+
+                {/* P6. Draped Throw on Armchair Right Arm */}
+                <div
+                  aria-hidden="true"
+                  style={{ left: '17.8%', top: '44%', width: '6.8%', height: '16%' }}
+                  className="pointer-events-none absolute z-18 rounded-[0.9cqw] border-[0.14cqw] border-dashed border-[#EF4E5E]/55 bg-[#FAD4D8]/65 flex items-center justify-center"
+                >
+                  <span className="font-paper-mono text-[0.85cqw] text-[#9D3A46] text-center leading-tight">
+                    搭毯
+                  </span>
                 </div>
 
-                <h1 className="font-display text-[26px] sm:text-[32px] font-bold tracking-[-0.03em] leading-tight text-[#0F172A]">
-                  {currentSkill.shortCn} ·{' '}
-                  <span className="text-[#1E63D6] font-normal text-[22px] sm:text-[26px]">
-                    {currentSkill.tabLabel}
-                  </span>
-                </h1>
-                <p className="font-paper-mono text-[11px] sm:text-[11.5px] text-[#786858] mt-0.5">
-                  {currentSkill.taglineCn}
-                </p>
-              </div>
+                {/* --- CENTER-LEFT FLOOR LAMP --- */}
 
-              {/* SCALLOPED STAMP CANVASES (Main Transformer) */}
-              <motion.div
-                key={`${currentSkill.id}-${uploadedImage?.name ?? activeSample}`}
-                initial={
-                  prefersReduced
-                    ? { opacity: 0 }
-                    : { opacity: 0, y: 10, scale: 0.97 }
-                }
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={SPRING_SNAPPY}
-                style={{
-                  filter: 'drop-shadow(0 20px 36px rgba(15,23,42,0.16))'
-                }}
-                className="w-full"
-              >
-                <div className="stamp-card-mask bg-[#FFFFFF] p-4 sm:p-5">
+                {/* P7. Tall Pleated Floor Lamp (Toggles Room Warm Glow) */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    setLampOn((v) => !v);
+                    playSoftDeskChime('click');
+                    spawnQuip(lampOn ? 'lamp off' : 'warm light ✦', 28.5, 16);
+                  }}
+                  onMouseEnter={() => setHoveredObj('lamp')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -2 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.97 }}
+                  aria-label="落地灯开关"
+                  style={{ left: '24.6%', top: '18.5%', width: '8.2%', height: '54%' }}
+                  className={`absolute ${hoveredObj === 'lamp' ? 'z-40' : 'z-18'} cursor-pointer flex flex-col items-center justify-between focus-visible:outline-2 focus-visible:outline-[#1E63D6] rounded-xl`}
+                >
+                  <ObjectTooltip
+                    visible={hoveredObj === 'lamp'}
+                    label={lampOn ? '关掉落地灯' : '打开暖光落地灯'}
+                    sublabel="点击切换灯光"
+                  />
+                  {/* Lampshade placeholder */}
                   <div
-                    ref={cardRef}
-                    className="relative w-full aspect-[16/10] rounded-[4px] overflow-hidden border border-[#0F172A]/10 bg-[#F6F5F0] select-none"
+                    className={`w-full h-[27%] rounded-t-[2.4cqw] rounded-b-[0.7cqw] border-[0.16cqw] border-dashed flex items-center justify-center transition-colors ${
+                      lampOn
+                        ? 'border-[#EF4E5E]/75 bg-[#FCE055]/65'
+                        : 'border-[#6E5644]/55 bg-[#EFECE6]/85'
+                    }`}
                   >
-                    {/* UNDERNEATH LAYER: STYLED OUTPUT */}
-                    {isVisualSkill ? (
-                      <div className="absolute inset-0">
-                        <canvas
-                          ref={afterCanvasRef}
-                          className="w-full h-full block"
-                        />
-                        <span
-                          className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 rounded-[4px] px-2 py-0.5 font-paper-mono text-[9.5px] font-semibold tracking-wide shadow-sm"
-                          style={{
-                            backgroundColor: currentMeta.tagBg,
-                            color: currentMeta.tagText
-                          }}
-                        >
-                          {currentSkill.outputTag}
-                        </span>
-                      </div>
-                    ) : (
-                      /* Workflow Engineering Preview */
-                      <div className="absolute inset-0 bg-[#FFFFFF] p-5 sm:p-6 flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <span className="font-paper-mono text-[10px] font-semibold text-[#1E63D6] bg-[#EDF4FF] px-2 py-0.5 rounded-[4px]">
-                            DETERMINISTIC SPEC
-                          </span>
-                          <Sparkles className="w-4 h-4 text-[#1E63D6]" />
-                        </div>
-                        <div className="space-y-1.5 font-paper-mono text-[12px] sm:text-[13px] leading-relaxed text-[#0F172A]">
-                          {currentSkill.workflowDiff?.outputLines.map(
-                            (line, idx) => (
-                              <p key={idx}>
-                                <span className="text-[#786858]">
-                                  {line.text}
-                                </span>
-                                {line.highlight && (
-                                  <span className="bg-[#FCE055] px-1 py-0.5 rounded-[3px] font-semibold text-[#0F172A]">
-                                    {line.highlight}
-                                  </span>
-                                )}
-                                {line.after && <span>{line.after}</span>}
-                              </p>
-                            )
-                          )}
-                        </div>
-                        <span className="font-paper-mono text-[9.5px] text-[#786858]">
-                          03 // {currentSkill.title}
-                        </span>
-                      </div>
-                    )}
+                    <span className="font-paper-mono text-[0.95cqw] text-[#6E5644]">
+                      落地灯罩
+                    </span>
+                  </div>
+                  {/* Lamp stem */}
+                  <div className="w-[0.55cqw] flex-1 bg-[#D6BA73]/80 border-x border-[#6E5644]/40" />
+                  {/* Lamp base */}
+                  <div className="w-[58%] h-[5.5%] rounded-full border-[0.15cqw] border-dashed border-[#6E5644]/60 bg-[#E6D5A7]" />
+                </motion.button>
 
-                    {/* TOP LAYER: RAW INPUT (Clipped along 45deg peel) */}
+                {/* --- CENTER WALL: HANGING PLANT + DOUBLE FRENCH WINDOW --- */}
+
+                {/* P8. Hanging Trailing Plant */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.hanging ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, hanging: count }));
+                    spawnQuip('leafy breeze 🌿', 35, 3);
+                  }}
+                  onMouseEnter={() => setHoveredObj('hanging')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { rotate: 3 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.96 }}
+                  aria-label="垂吊绿植占位"
+                  style={{ left: '31.5%', top: '3.5%', width: '7.5%', height: '27%' }}
+                  className={`absolute ${hoveredObj === 'hanging' ? 'z-40' : 'z-22'} cursor-pointer rounded-[1cqw] border-[0.16cqw] border-dashed border-[#4B7A54]/60 bg-[#E4F0E5]/85 flex flex-col items-center justify-center p-[0.4cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'hanging'} label="垂吊绿植" sublabel="植物占位块" placement="bottom" />
+                  <span className="font-paper-mono text-[0.95cqw] text-[#3F6647] text-center leading-tight">
+                    垂吊绿植
+                  </span>
+                </motion.button>
+
+                {/* P9. Large Double French Window (Toggles Morning <-> Golden Hour) */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    setEveningMode((v) => !v);
+                    spawnQuip(eveningMode ? 'morning sun ☀' : 'golden hour ✨', 50, 9);
+                  }}
+                  onMouseEnter={() => setHoveredObj('window')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { scale: 1.01 }}
+                  aria-label="双扇大窗景开关"
+                  style={{ left: '39.5%', top: '12.5%', width: '21.8%', height: '43.5%' }}
+                  className={`absolute ${hoveredObj === 'window' ? 'z-40' : 'z-12'} cursor-pointer rounded-[0.8cqw] border-[0.18cqw] border-dashed border-[#6E5644]/65 bg-[#FFFFFF]/85 p-[0.9cqw] flex flex-col gap-[0.6cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip
+                    visible={hoveredObj === 'window'}
+                    label={eveningMode ? '切换晨光窗景' : '切换黄昏柔光'}
+                    sublabel="点击改变房间光线"
+                  />
+                  {/* Upper transom panes */}
+                  <div className="w-full h-[22%] grid grid-cols-2 gap-[0.6cqw]">
                     <div
-                      className="absolute inset-0 pointer-events-none"
-                      style={{ clipPath: peelGeom.remainClipPath }}
+                      className={`rounded-[0.3cqw] border border-[#6E5644]/35 transition-colors duration-500 ${
+                        eveningMode ? 'bg-[#FDE4BA]' : 'bg-[#DCEBFF]'
+                      }`}
+                    />
+                    <div
+                      className={`rounded-[0.3cqw] border border-[#6E5644]/35 transition-colors duration-500 ${
+                        eveningMode ? 'bg-[#FDE4BA]' : 'bg-[#DCEBFF]'
+                      }`}
+                    />
+                  </div>
+                  {/* Main double window casements */}
+                  <div className="w-full flex-1 grid grid-cols-2 gap-[0.6cqw]">
+                    <div
+                      className={`rounded-[0.3cqw] border border-[#6E5644]/35 flex items-center justify-center transition-colors duration-500 ${
+                        eveningMode ? 'bg-[#F8C697]/65' : 'bg-[#E5F0FF]'
+                      }`}
                     >
-                      {isVisualSkill ? (
-                        <div className="relative w-full h-full">
-                          <canvas
-                            ref={beforeCanvasRef}
-                            className="w-full h-full block"
+                      <span className="font-paper-mono text-[1cqw] text-[#786858]">
+                        左窗景
+                      </span>
+                    </div>
+                    <div
+                      className={`rounded-[0.3cqw] border border-[#6E5644]/35 flex items-center justify-center transition-colors duration-500 ${
+                        eveningMode ? 'bg-[#F8C697]/65' : 'bg-[#E5F0FF]'
+                      }`}
+                    >
+                      <span className="font-paper-mono text-[1cqw] text-[#786858]">
+                        右窗景
+                      </span>
+                    </div>
+                  </div>
+                </motion.button>
+
+                {/* --- LOWER-CENTER OVAL COFFEE TABLE + 5 TABLETOP ITEMS --- */}
+
+                {/* P10. Pale Blue Oval Coffee Table */}
+                <div
+                  style={{ left: '28.5%', top: '67%', width: '32%', height: '24.5%' }}
+                  className="pointer-events-none absolute z-22 flex flex-col items-center"
+                >
+                  {/* Oval tabletop */}
+                  <div className="w-full h-[54%] rounded-[999px] border-[0.18cqw] border-dashed border-[#1E63D6]/50 bg-[#E3EEFB]/90 shadow-[0_8px_18px_rgba(15,23,42,0.06)] flex items-end justify-center pb-[0.8cqw]">
+                    <span className="font-paper-mono text-[1cqw] text-[#5B7596]">
+                      浅蓝椭圆茶几
+                    </span>
+                  </div>
+                  {/* 4 slim white legs */}
+                  <div className="w-[82%] flex-1 flex justify-between px-[6%]">
+                    <span className="w-[0.65cqw] h-full rounded-b bg-[#FFFFFF] border border-[#6E5644]/40" />
+                    <span className="w-[0.65cqw] h-[82%] rounded-b bg-[#FFFFFF] border border-[#6E5644]/40" />
+                    <span className="w-[0.65cqw] h-[82%] rounded-b bg-[#FFFFFF] border border-[#6E5644]/40" />
+                    <span className="w-[0.65cqw] h-full rounded-b bg-[#FFFFFF] border border-[#6E5644]/40" />
+                  </div>
+                </div>
+
+                {/* Tabletop Item 1: Polka-Dot Teacup */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.cup1 ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, cup1: count }));
+                    spawnQuip('chamomile tea ☕', 32.5, 57);
+                  }}
+                  onMouseEnter={() => setHoveredObj('cup1')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -3 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.94 }}
+                  aria-label="茶几左茶杯占位"
+                  style={{ left: '30.2%', top: '61.5%', width: '4.6%', height: '7.5%' }}
+                  className={`absolute ${hoveredObj === 'cup1' ? 'z-40' : 'z-26'} cursor-pointer rounded-[0.6cqw] border-[0.15cqw] border-dashed border-[#6E5644]/60 bg-[#FFFFFF]/90 flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'cup1'} label="波点茶杯" sublabel="桌面占位" />
+                  <span className="font-paper-mono text-[0.8cqw] text-[#786858]">茶杯</span>
+                </motion.button>
+
+                {/* Tabletop Item 2: Strawberry Basket */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.berry ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, berry: count }));
+                    spawnQuip('fresh strawberries 🍓', 38.5, 56);
+                  }}
+                  onMouseEnter={() => setHoveredObj('berry')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -3, scale: 1.05 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.94 }}
+                  aria-label="草莓篮占位"
+                  style={{ left: '35.8%', top: '59.8%', width: '5.5%', height: '8.8%' }}
+                  className={`absolute ${hoveredObj === 'berry' ? 'z-40' : 'z-26'} cursor-pointer rounded-[0.6cqw] border-[0.15cqw] border-dashed border-[#EF4E5E]/65 bg-[#FAD4D8]/80 flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'berry'} label="一篮草莓" sublabel="桌面占位" />
+                  <span className="font-paper-mono text-[0.8cqw] text-[#9D3A46]">草莓篮</span>
+                </motion.button>
+
+                {/* Tabletop Item 3: Cookies Plate */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.cookies ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, cookies: count }));
+                    spawnQuip('warm cookies 🍪', 45, 59);
+                  }}
+                  onMouseEnter={() => setHoveredObj('cookies')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -3, scale: 1.05 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.94 }}
+                  aria-label="曲奇盘占位"
+                  style={{ left: '42.2%', top: '62.2%', width: '5.8%', height: '6.6%' }}
+                  className={`absolute ${hoveredObj === 'cookies' ? 'z-40' : 'z-26'} cursor-pointer rounded-full border-[0.15cqw] border-dashed border-[#6E5644]/60 bg-[#FAF2E3]/90 flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'cookies'} label="一盘曲奇" sublabel="桌面占位" />
+                  <span className="font-paper-mono text-[0.8cqw] text-[#786858]">曲奇盘</span>
+                </motion.button>
+
+                {/* Tabletop Item 4: Tall Glass Flower Vase (Overlaps window bottom) */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.vase ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, vase: count }));
+                    spawnQuip('fresh bouquet 💐', 52.5, 45);
+                  }}
+                  onMouseEnter={() => setHoveredObj('vase')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -4, scale: 1.03 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.96 }}
+                  aria-label="花瓶花束占位"
+                  style={{ left: '48.8%', top: '48.5%', width: '7.4%', height: '20.5%' }}
+                  className={`absolute ${hoveredObj === 'vase' ? 'z-40' : 'z-27'} cursor-pointer flex flex-col items-center justify-between focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'vase'} label="鲜花花瓶" sublabel="向上遮挡窗台" />
+                  <div className="w-full h-[54%] rounded-full border-[0.16cqw] border-dashed border-[#EF4E5E]/65 bg-[#FFE8EC]/88 flex items-center justify-center">
+                    <span className="font-paper-mono text-[0.85cqw] text-[#9D3A46]">花束</span>
+                  </div>
+                  <div className="w-[54%] h-[44%] rounded-[0.5cqw] border-[0.15cqw] border-dashed border-[#1E63D6]/55 bg-[#EDF4FF]/88 flex items-center justify-center">
+                    <span className="font-paper-mono text-[0.8cqw] text-[#1E63D6]">花瓶</span>
+                  </div>
+                </motion.button>
+
+                {/* Tabletop Item 5: Right Floral Mug */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.mug ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, mug: count }));
+                    spawnQuip('oat latte · 64°C ☕', 58, 57);
+                  }}
+                  onMouseEnter={() => setHoveredObj('mug')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -3 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.94 }}
+                  aria-label="茶几右咖啡杯占位"
+                  style={{ left: '56.6%', top: '60.8%', width: '4.4%', height: '7.8%' }}
+                  className={`absolute ${hoveredObj === 'mug' ? 'z-40' : 'z-26'} cursor-pointer rounded-[0.6cqw] border-[0.15cqw] border-dashed border-[#6E5644]/60 bg-[#FFFFFF]/90 flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'mug'} label="小花马克杯" sublabel="桌面占位" />
+                  <span className="font-paper-mono text-[0.8cqw] text-[#786858]">热饮</span>
+                </motion.button>
+
+                {/* --- UPPER-RIGHT FLOATING BOOKSHELF (SKILL 03 WORKFLOW) --- */}
+
+                {/* S3. CORE SKILL 03 — Floating Bookshelf */}
+                <motion.button
+                  type="button"
+                  onClick={() => handleOpenSkill('design-restraint')}
+                  onMouseEnter={() => setHoveredObj('design-restraint')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -4, scale: 1.02 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.97 }}
+                  transition={SPRING_SNAPPY}
+                  aria-label="探索 03 Design Restraint 工作流 Skill"
+                  style={{ left: '64.2%', top: '13.5%', width: '27.8%', height: '21.5%' }}
+                  className={`absolute ${hoveredObj === 'design-restraint' ? 'z-40' : 'z-18'} cursor-pointer flex flex-col justify-end p-[0.6cqw] rounded-[0.8cqw] border-[0.2cqw] border-[#1E63D6] bg-[#EDF4FF]/85 shadow-[0_6px_16px_rgba(30,99,214,0.10)] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip
+                    visible={hoveredObj === 'design-restraint'}
+                    label="03 · UI Restraint 工作流"
+                    sublabel="点击查看规范转换"
+                    align="right"
+                  />
+                  {/* Placeholder book & vase blocks sitting on shelf */}
+                  <div className="w-full flex-1 flex items-end justify-between gap-[0.6cqw] px-[0.4cqw] pb-[0.4cqw]">
+                    <div className="w-[18%] h-[78%] rounded-[0.3cqw] bg-[#FCE055]/65 border border-[#6E5644]/40" />
+                    <div className="w-[10%] h-[58%] rounded-[0.3cqw] bg-[#FFFFFF]/90 border border-[#6E5644]/40" />
+                    <div className="w-[24%] h-[88%] rounded-[0.3cqw] bg-[#D9E7FF] border border-[#1E63D6]/45 flex items-center justify-center">
+                      <span className="font-paper-mono text-[0.95cqw] font-semibold text-[#1E63D6]">
+                        SKILL 03
+                      </span>
+                    </div>
+                    <div className="w-[16%] h-[72%] rounded-[0.3cqw] bg-[#FAD4D8]/75 border border-[#EF4E5E]/40" />
+                    <div className="w-[14%] h-[64%] rounded-[0.4cqw] bg-[#F5F2EA] border border-[#6E5644]/40" />
+                  </div>
+                  {/* Shelf plank */}
+                  <div className="w-full h-[1cqw] rounded-full bg-[#B99878] border border-[#6E5644]/50 flex items-center justify-center" />
+                  <span className="font-paper-mono text-[0.9cqw] text-[#0F172A] mt-[0.35cqw] text-center">
+                    长条书架 · UI 工作流规范
+                  </span>
+                </motion.button>
+
+                {/* --- LOWER-RIGHT 2-SEATER SOFA + PATCHWORK QUILT --- */}
+
+                {/* P11. Sage 2-Seater Sofa */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.sofa ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, sofa: count }));
+                    spawnQuip('afternoon nap sofa ~', 75, 41);
+                  }}
+                  onMouseEnter={() => setHoveredObj('sofa')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { y: -3 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.98 }}
+                  aria-label="双人沙发占位"
+                  style={{ left: '61.5%', top: '43.5%', width: '27.2%', height: '39%' }}
+                  className={`absolute ${hoveredObj === 'sofa' ? 'z-40' : 'z-16'} cursor-pointer rounded-[1.8cqw] border-[0.18cqw] border-dashed border-[#5E7466]/65 bg-[#DCE5DC]/85 flex flex-col items-center justify-end pb-[2.5cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'sofa'} label="双人沙发" sublabel="家具占位块" />
+                  <span className="font-paper-mono text-[1.15cqw] text-[#4B5F52] font-medium">
+                    双人沙发
+                  </span>
+                  <span className="absolute -bottom-[1.2cqw] left-[12%] w-[1cqw] h-[1.5cqw] rounded-b bg-[#C4B299] border border-[#6E5644]/50" />
+                  <span className="absolute -bottom-[1.2cqw] right-[12%] w-[1cqw] h-[1.5cqw] rounded-b bg-[#C4B299] border border-[#6E5644]/50" />
+                </motion.button>
+
+                {/* P12. Patchwork Quilt Draped on Sofa Left */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.quilt ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, quilt: count }));
+                    spawnQuip('handmade patchwork ✦', 64, 49);
+                  }}
+                  onMouseEnter={() => setHoveredObj('quilt')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { rotate: -2, scale: 1.04 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.95 }}
+                  aria-label="拼布盖毯占位"
+                  style={{ left: '59.2%', top: '51%', width: '9.6%', height: '19.5%' }}
+                  className={`absolute ${hoveredObj === 'quilt' ? 'z-40' : 'z-24'} cursor-pointer rounded-[1.1cqw] border-[0.16cqw] border-dashed border-[#EF4E5E]/60 bg-[#FCE055]/55 flex items-center justify-center p-[0.4cqw] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip visible={hoveredObj === 'quilt'} label="拼布盖毯" sublabel="装饰占位块" />
+                  <span className="font-paper-mono text-[0.95cqw] text-[#6E5644] text-center leading-tight">
+                    拼布盖毯
+                  </span>
+                </motion.button>
+
+                {/* --- FAR-RIGHT WOVEN BASKET FLOOR PLANT --- */}
+
+                {/* P13. Tall Woven-Basket Alocasia Plant */}
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const count = (tapCounts.floorPlant ?? 0) + 1;
+                    setTapCounts((p) => ({ ...p, floorPlant: count }));
+                    spawnQuip('photosynthesis +1 🌿', 90, 34);
+                  }}
+                  onMouseEnter={() => setHoveredObj('floorPlant')}
+                  onMouseLeave={() => setHoveredObj(null)}
+                  whileHover={prefersReduced ? undefined : { rotate: 2, y: -3 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.96 }}
+                  aria-label="落地大绿植占位"
+                  style={{ left: '84.8%', top: '36.5%', width: '12.6%', height: '51%' }}
+                  className={`absolute ${hoveredObj === 'floorPlant' ? 'z-40' : 'z-24'} cursor-pointer flex flex-col items-center justify-between focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                >
+                  <ObjectTooltip
+                    visible={hoveredObj === 'floorPlant'}
+                    label="大叶盆栽"
+                    sublabel="落地绿植占位块"
+                    align="right"
+                  />
+                  {/* Foliage crown placeholder */}
+                  <div className="w-full h-[64%] rounded-[2cqw] border-[0.16cqw] border-dashed border-[#4B7A54]/60 bg-[#DDECE0]/85 flex items-center justify-center p-[0.4cqw]">
+                    <span className="font-paper-mono text-[1cqw] text-[#3F6647] text-center">
+                      大叶绿植
+                    </span>
+                  </div>
+                  {/* Woven basket pot placeholder */}
+                  <div className="w-[66%] h-[32%] rounded-[1cqw] border-[0.16cqw] border-dashed border-[#8C6D4F]/65 bg-[#E6D1B3]/90 flex items-center justify-center p-[0.3cqw]">
+                    <span className="font-paper-mono text-[0.9cqw] text-[#6E5644]">
+                      编织花盆
+                    </span>
+                  </div>
+                </motion.button>
+
+                {/* Floating Script Easter-Egg Bubbles */}
+                <div className="pointer-events-none absolute inset-0 z-35 overflow-hidden">
+                  <AnimatePresence>
+                    {quips.map((q) => (
+                      <motion.span
+                        key={q.id}
+                        initial={
+                          prefersReduced
+                            ? { opacity: 0 }
+                            : { opacity: 0, y: 8, scale: 0.9 }
+                        }
+                        animate={{ opacity: 1, y: -22, scale: 1 }}
+                        exit={{ opacity: 0, y: -36 }}
+                        transition={{ duration: 1.25, ease: [0.22, 1, 0.36, 1] }}
+                        style={{
+                          left: `${q.xPct}%`,
+                          top: `${q.yPct}%`,
+                          color: q.color
+                        }}
+                        className="absolute -translate-x-1/2 font-script text-[22px] sm:text-[26px] font-bold whitespace-nowrap drop-shadow-[0_2px_4px_rgba(255,255,255,0.95)]"
+                      >
+                        {q.text}
+                      </motion.span>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          {/* ================================================================
+              SKILL SPECIMEN INSPECTOR MODAL (Opens when clicking a Skill object)
+             ================================================================ */}
+          <AnimatePresence>
+            {activeSkill && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setActiveSkillId(null);
+                }}
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 backdrop-blur-md bg-[#FEFCF8]/80 overflow-y-auto"
+              >
+                <motion.div
+                  initial={
+                    prefersReduced
+                      ? { opacity: 0 }
+                      : { opacity: 0, y: 12, scale: 0.96 }
+                  }
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={
+                    prefersReduced
+                      ? { opacity: 0 }
+                      : { opacity: 0, y: 8, scale: 0.97 }
+                  }
+                  transition={SPRING_SNAPPY}
+                  className="relative w-full max-w-[880px] rounded-2xl bg-[#FFFFFF] border border-[#E5E7EB] shadow-[0_20px_54px_rgba(15,23,42,0.12)] overflow-hidden my-auto"
+                >
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between gap-4 px-5 sm:px-7 py-4 border-b border-[#E5E7EB]">
+                    <div className="flex items-center gap-2 font-paper-mono text-[12px] text-[#786858]">
+                      <span className="font-semibold text-[#1E63D6]">
+                        {activeSkill.indexLabel}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span>{activeSkill.kindLabel}</span>
+                      <span aria-hidden="true" className="hidden sm:inline">
+                        ·
+                      </span>
+                      <span className="hidden sm:inline">
+                        {activeSkill.deskObjectLabel}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => navigateSkill(-1)}
+                        aria-label="上一个 Skill"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-[#374151] hover:bg-[#EDF4FF] hover:text-[#1E63D6] transition-colors cursor-pointer"
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateSkill(1)}
+                        aria-label="下一个 Skill"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-[#374151] hover:bg-[#EDF4FF] hover:text-[#1E63D6] transition-colors cursor-pointer"
+                      >
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSkillId(null)}
+                        aria-label="放回桌面"
+                        className="ml-1 flex h-8 w-8 items-center justify-center rounded-lg text-[#374151] hover:bg-[#F6F5F0] transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Modal Body: 2 Columns */}
+                  <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)] gap-6 p-5 sm:p-7 items-start">
+                    {/* Left: Authentic Showcase Output + Interactive 2.2x Macro Loupe */}
+                    <div className="space-y-3">
+                      {activeSkill.kind === 'visual' &&
+                      activeSkill.previewImage ? (
+                        <div
+                          onMouseMove={(e) => {
+                            const rect =
+                              e.currentTarget.getBoundingClientRect();
+                            if (!rect.width || !rect.height) return;
+                            setLoupePos({
+                              active: true,
+                              xPct:
+                                ((e.clientX - rect.left) / rect.width) * 100,
+                              yPct:
+                                ((e.clientY - rect.top) / rect.height) * 100
+                            });
+                          }}
+                          onMouseLeave={() =>
+                            setLoupePos((p) => ({ ...p, active: false }))
+                          }
+                          className="relative aspect-square w-full rounded-xl bg-[#F6F5F0] border border-[#E5E7EB] overflow-hidden cursor-zoom-in"
+                        >
+                          <img
+                            src={activeSkill.previewImage}
+                            alt={activeSkill.previewAlt || activeSkill.title}
+                            referrerPolicy="no-referrer"
+                            draggable={false}
+                            className="w-full h-full object-cover"
                           />
-                          <span className="absolute top-2.5 left-2.5 rounded-[4px] bg-[#FEFCF8]/90 border border-[#0F172A]/10 px-2 py-0.5 font-paper-mono text-[9.5px] font-semibold text-[#786858]">
-                            {uploadedImage
-                              ? `原图 · ${uploadedImage.name.slice(0, 16)}`
-                              : 'RAW 原图'}
+
+                          {/* 2.2x Macro Fiber & Texture Loupe on Hover */}
+                          {loupePos.active && !prefersReduced && (
+                            <div
+                              aria-hidden="true"
+                              className="pointer-events-none absolute w-28 h-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#FCE055] shadow-[0_10px_24px_rgba(15,23,42,0.28)]"
+                              style={{
+                                left: `${loupePos.xPct}%`,
+                                top: `${loupePos.yPct}%`,
+                                backgroundImage: `url(${activeSkill.previewImage})`,
+                                backgroundSize: '220% 220%',
+                                backgroundPosition: `${loupePos.xPct}% ${loupePos.yPct}%`
+                              }}
+                            />
+                          )}
+
+                          <span className="pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-md bg-[#FEFCF8]/92 px-2 py-1 font-paper-mono text-[10.5px] text-[#0F172A] border border-[#E5E7EB]">
+                            <ZoomIn className="w-3 h-3 text-[#1E63D6]" />
+                            <span>2.2x detail</span>
                           </span>
                         </div>
                       ) : (
-                        <div className="w-full h-full bg-[#F6F5F0] p-5 sm:p-6 flex flex-col justify-between">
-                          <span className="font-paper-mono text-[10px] font-semibold text-[#786858]">
-                            RAW PROMPT (BEFORE)
-                          </span>
-                          <p className="font-paper-mono text-[12.5px] sm:text-[13.5px] leading-relaxed text-[#374151]">
-                            {currentSkill.workflowDiff?.inputText}
-                          </p>
-                          <span className="font-paper-mono text-[9.5px] text-[#786858]/75">
-                            掀开黄角查看审查结果 ↗
-                          </span>
+                        <div className="space-y-3">
+                          <div className="rounded-xl bg-[#F6F5F0] border border-[#E5E7EB] p-4 space-y-1.5">
+                            <span className="block font-paper-mono text-[11px] font-semibold text-[#786858]">
+                              {activeSkill.workflowDiff?.inputLabel}
+                            </span>
+                            <p className="font-paper-mono text-[12px] leading-relaxed text-[#374151]">
+                              {activeSkill.workflowDiff?.inputText}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-[#FEFCF8] border border-[#1E63D6]/30 p-4 space-y-2">
+                            <span className="block font-paper-mono text-[11px] font-semibold text-[#1E63D6]">
+                              {activeSkill.workflowDiff?.outputLabel}
+                            </span>
+                            <div className="space-y-1.5 font-paper-mono text-[12px] leading-relaxed text-[#0F172A]">
+                              {activeSkill.workflowDiff?.outputLines.map(
+                                (line, i) => (
+                                  <p key={i}>
+                                    <span className="text-[#786858]">
+                                      {line.text}
+                                    </span>
+                                    {line.highlight && (
+                                      <span className="bg-[#FCE055] px-1 py-0.5 rounded-[3px] font-semibold text-[#0F172A]">
+                                        {line.highlight}
+                                      </span>
+                                    )}
+                                    {line.after && <span>{line.after}</span>}
+                                  </p>
+                                )
+                              )}
+                            </div>
+                          </div>
                         </div>
                       )}
+
+                      <p className="font-paper-mono text-[11.5px] text-[#786858] leading-snug">
+                        {activeSkill.mediumNote}
+                      </p>
                     </div>
 
-                    {/* TAPERED SLEEK PEEL FLAP */}
-                    {peelGeom.curlPath && (
-                      <svg
-                        width={cardSize.w}
-                        height={cardSize.h}
-                        viewBox={`0 0 ${cardSize.w} ${cardSize.h}`}
-                        className="pointer-events-none absolute inset-0 w-full h-full overflow-visible"
-                      >
-                        <defs>
-                          <linearGradient
-                            id="galleryPeelFlap"
-                            x1="0"
-                            y1="1"
-                            x2="1"
-                            y2="0"
-                          >
-                            <stop offset="0%" stopColor="#E6C330" />
-                            <stop offset="55%" stopColor="#FCE055" />
-                            <stop offset="100%" stopColor="#FFF4B8" />
-                          </linearGradient>
-                          <filter
-                            id="galleryPeelShadow"
-                            x="-30%"
-                            y="-30%"
-                            width="160%"
-                            height="160%"
-                          >
-                            <feDropShadow
-                              dx="3"
-                              dy="-3"
-                              stdDeviation="4"
-                              floodColor="#0F172A"
-                              floodOpacity="0.22"
-                            />
-                          </filter>
-                        </defs>
-                        <path
-                          d={peelGeom.curlPath}
-                          fill="url(#galleryPeelFlap)"
-                          stroke="rgba(15,23,42,0.14)"
-                          strokeWidth="1"
-                          filter="url(#galleryPeelShadow)"
-                        />
-                        {peelGeom.foldPath && (
-                          <path
-                            d={peelGeom.foldPath}
-                            fill="none"
-                            stroke="rgba(15,23,42,0.18)"
-                            strokeWidth="1"
-                          />
-                        )}
-                      </svg>
-                    )}
-
-                    {/* INTERACTIVE PEEL HANDLE WITH HOVER FLUTTER */}
-                    <div
-                      role="slider"
-                      tabIndex={0}
-                      aria-label="拖拽右上角对比原图与效果"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={Math.round(peelRatio * 100)}
-                      onMouseEnter={() => setCornerHovered(true)}
-                      onMouseLeave={() => setCornerHovered(false)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          setPeelRatio((p) => Math.min(1, p + 0.12));
-                        } else if (
-                          e.key === 'ArrowRight' ||
-                          e.key === 'ArrowUp'
-                        ) {
-                          e.preventDefault();
-                          setPeelRatio((p) => Math.max(0.14, p - 0.12));
-                        }
-                      }}
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        peelDraggingRef.current = true;
-                        peelMovedRef.current = false;
-                        setIsPeelDragging(true);
-                      }}
-                      style={{
-                        left: peelGeom.handlePos.x,
-                        top: peelGeom.handlePos.y
-                      }}
-                      className={`absolute -translate-x-1/2 -translate-y-1/2 z-30 cursor-grab active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-[#1E63D6] transition-transform ${
-                        isPeelDragging
-                          ? 'scale-110'
-                          : cornerHovered
-                            ? 'scale-110 -rotate-3'
-                            : 'hover:scale-105'
-                      }`}
-                    >
-                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#FCE055] border border-[#0F172A]/20 font-paper-mono text-[9.5px] font-semibold text-[#0F172A] shadow-[0_4px_10px_rgba(15,23,42,0.18)] whitespace-nowrap">
-                        {peelRatio >= 0.92
-                          ? '↺ 合上'
-                          : peelRatio <= 0.24
-                            ? '↙ 掀开'
-                            : `${Math.round(peelRatio * 100)}%`}
-                      </span>
-                    </div>
-
-                    {/* Drag & drop highlight */}
-                    {isDragOver && (
-                      <div className="pointer-events-none absolute inset-1.5 z-40 rounded border-2 border-dashed border-[#1E63D6] bg-[#EDF4FF]/92 flex flex-col items-center justify-center gap-1 font-paper-mono text-[#1E63D6]">
-                        <span className="text-[13px] font-semibold">
-                          松手喂入你的照片
-                        </span>
-                        <span className="text-[10.5px] opacity-80">
-                          即刻施展 {currentSkill.shortCn}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* CRYSTAL CLEAR INPUT TRAY (理顺输入源：传图/模特 vs 需求输入) */}
-              <div className="w-full mt-3 flex items-center justify-between gap-2 px-1 flex-wrap">
-                {isVisualSkill ? (
-                  <>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-paper-mono text-[10.5px] text-[#786858]">
-                        试玩模特:
-                      </span>
-                      {SAMPLE_MODELS.map((model) => {
-                        const active =
-                          uploadedImage === null && activeSample === model.id;
-                        return (
-                          <button
-                            key={model.id}
-                            type="button"
-                            onClick={() => {
-                              setUploadedImage(null);
-                              setActiveSample(model.id);
-                              triggerSparkleBurst();
-                            }}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[8px] font-paper-mono text-[10.5px] border transition-all cursor-pointer ${
-                              active
-                                ? 'bg-[#FFFFFF] border-[#1E63D6] text-[#1E63D6] font-semibold shadow-[0_2px_6px_rgba(30,99,214,0.12)]'
-                                : 'bg-[#FEFCF8] border-[#E5E7EB] text-[#374151] hover:bg-[#FFFFFF] hover:border-[#1E63D6]/40'
-                            }`}
-                          >
-                            <span>{model.icon}</span>
-                            <span>{model.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          handleLoadUploadedFile(e.target.files?.[0]);
-                          e.currentTarget.value = '';
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[8px] bg-[#FFFFFF] border border-[#1E63D6]/35 font-paper-mono text-[10.5px] font-semibold text-[#1E63D6] hover:bg-[#1E63D6] hover:text-white active:scale-95 transition-all cursor-pointer shadow-sm"
-                      >
-                        <ImagePlus className="w-3.5 h-3.5" />
-                        <span>{uploadedImage ? '更换照片' : '上传我的照片'}</span>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-full flex items-center justify-between gap-2 flex-wrap font-paper-mono text-[11px]">
-                    <span className="text-[#786858]">
-                      工作流说明：自动审查需求违规并映射为确定性 Token
-                    </span>
-                    <span className="text-[#1E63D6] bg-[#EDF4FF] px-2 py-0.5 rounded-[4px] font-medium">
-                      + 更多工作流 Skill 建设中
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* PURPOSEFUL, STRUCTURED BOTTOM DOCK (解决所有按钮困惑) */}
-            <div className="fixed bottom-5 sm:bottom-7 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-3 max-w-[96vw]">
-              {/* SKILL.md popover note card */}
-              <AnimatePresence>
-                {noteOpen && (
-                  <motion.div
-                    initial={
-                      prefersReduced
-                        ? { opacity: 0 }
-                        : { opacity: 0, y: 12, scale: 0.96 }
-                    }
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={
-                      prefersReduced
-                        ? { opacity: 0 }
-                        : { opacity: 0, y: 8, scale: 0.96 }
-                    }
-                    transition={SPRING_SNAPPY}
-                    className="w-[310px] sm:w-[370px] rounded-2xl bg-[#FFFFFF]/98 backdrop-blur-md border border-[#0F172A]/10 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.16)] space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
+                    {/* Right: Editorial Details & Copyable Recipe */}
+                    <div className="space-y-5">
                       <div>
-                        <span className="font-paper-mono text-[10px] font-semibold text-[#1E63D6]">
-                          {currentSkill.kindLabel}
-                        </span>
-                        <h3 className="font-display text-[17px] font-bold text-[#0F172A] leading-tight">
-                          {currentSkill.title}
-                        </h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setNoteOpen(false)}
-                        aria-label="关闭便签"
-                        className="p-1 rounded-md hover:bg-[#F6F5F0] text-[#786858] cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <p className="font-display text-[12.5px] leading-relaxed text-[#374151]">
-                      {currentSkill.subtitle}
-                    </p>
-
-                    <div className="rounded-xl bg-[#F6F5F0] border border-[#E5E7EB] p-2.5 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="inline-flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setRecipeTab('rules')}
-                            className={`px-2 py-0.5 rounded font-paper-mono text-[10.5px] cursor-pointer ${
-                              recipeTab === 'rules'
-                                ? 'bg-[#EDF4FF] text-[#1E63D6] font-semibold'
-                                : 'text-[#786858]'
-                            }`}
-                          >
-                            SKILL.md
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRecipeTab('prompt')}
-                            className={`px-2 py-0.5 rounded font-paper-mono text-[10.5px] cursor-pointer ${
-                              recipeTab === 'prompt'
-                                ? 'bg-[#EDF4FF] text-[#1E63D6] font-semibold'
-                                : 'text-[#786858]'
-                            }`}
-                          >
-                            Prompt 咒语
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 font-paper-mono text-[10.5px] text-[#786858]">
-                          <button
-                            type="button"
-                            onClick={handleDownloadSkillMd}
-                            className="hover:text-[#1E63D6] cursor-pointer"
-                          >
-                            .md
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleCopyRecipe}
-                            className="inline-flex items-center gap-1 hover:text-[#1E63D6] cursor-pointer"
-                          >
-                            {copiedCode ? (
-                              <Check className="w-3 h-3 text-[#1E63D6]" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                            <span>{copiedCode ? '已复制' : '复制'}</span>
-                          </button>
-                        </div>
+                        <h2 className="font-display text-[26px] sm:text-[30px] font-bold tracking-[-0.03em] leading-[1.12] text-[#0F172A]">
+                          {activeSkill.title}
+                        </h2>
+                        <p className="font-display text-[14.5px] leading-[1.7] text-[#374151] mt-2">
+                          {activeSkill.subtitle}
+                        </p>
                       </div>
 
-                      <pre className="font-paper-mono text-[10.5px] leading-[1.55] max-h-[140px] overflow-auto text-[#0F172A]/85 whitespace-pre-wrap">
-                        <code>
-                          {recipeTab === 'rules'
-                            ? currentSkill.recipeMarkdown
-                            : currentSkill.promptTemplate}
-                        </code>
-                      </pre>
+                      {/* Craft Principles (Clean hairline list, zero thick left accent borders) */}
+                      <div className="space-y-2.5 pt-1 border-t border-[#E5E7EB]">
+                        {activeSkill.constraints.map((c, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-baseline gap-2.5 text-[13px] leading-relaxed"
+                          >
+                            <span className="font-paper-mono text-[11px] font-semibold text-[#1E63D6] tabular-nums shrink-0">
+                              0{idx + 1}
+                            </span>
+                            <p className="font-display text-[#374151]">
+                              <strong className="font-semibold text-[#0F172A]">
+                                {c.label}：
+                              </strong>
+                              {c.detail}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Copyable SKILL.md / Prompt Recipe */}
+                      <div className="rounded-xl bg-[#F6F5F0] border border-[#E5E7EB] p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="inline-flex items-center gap-1 p-0.5 rounded-md bg-[#FEFCF8] border border-[#E5E7EB]">
+                            <button
+                              type="button"
+                              onClick={() => setRecipeTab('rules')}
+                              className={`px-2.5 py-1 rounded-[4px] font-paper-mono text-[11px] transition-colors cursor-pointer ${
+                                recipeTab === 'rules'
+                                  ? 'bg-[#EDF4FF] text-[#1E63D6] font-semibold'
+                                  : 'text-[#786858] hover:text-[#0F172A]'
+                              }`}
+                            >
+                              SKILL.md
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRecipeTab('prompt')}
+                              className={`px-2.5 py-1 rounded-[4px] font-paper-mono text-[11px] transition-colors cursor-pointer ${
+                                recipeTab === 'prompt'
+                                  ? 'bg-[#EDF4FF] text-[#1E63D6] font-semibold'
+                                  : 'text-[#786858] hover:text-[#0F172A]'
+                              }`}
+                            >
+                              Prompt
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-3 font-paper-mono text-[11px] text-[#786858]">
+                            <button
+                              type="button"
+                              onClick={handleDownloadSkillMd}
+                              className="inline-flex items-center gap-1 hover:text-[#1E63D6] transition-colors cursor-pointer"
+                            >
+                              <Download className="w-3 h-3" />
+                              <span>.md</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCopyRecipe}
+                              className="inline-flex items-center gap-1 hover:text-[#1E63D6] transition-colors cursor-pointer"
+                            >
+                              {copiedCode ? (
+                                <>
+                                  <Check className="w-3 h-3 text-[#1E63D6]" />
+                                  <span className="text-[#1E63D6]">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <pre className="font-paper-mono code-features text-[11.5px] leading-[1.6] max-h-[192px] pb-1 overflow-auto text-[#0F172A]/90 whitespace-pre-wrap">
+                          <code>
+                            {recipeTab === 'rules'
+                              ? activeSkill.recipeMarkdown
+                              : activeSkill.promptTemplate}
+                          </code>
+                        </pre>
+                      </div>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Main Floating Glass Dock */}
-              <div className="flex items-center gap-1.5 rounded-[20px] bg-[#FFFFFF]/92 backdrop-blur-md border border-[#0F172A]/10 p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.10)]">
-                {/* 1. Skill Selector in current category */}
-                <div
-                  className="flex items-center gap-1"
-                  role="tablist"
-                  aria-label="选择技能"
-                >
-                  {PORTFOLIO_SKILLS.filter(
-                    (s) => s.category === activeCategory
-                  ).map((skill) => {
-                    const idx = PORTFOLIO_SKILLS.findIndex(
-                      (p) => p.id === skill.id
-                    );
-                    const active = idx === activeSkillIndex;
-                    const meta =
-                      SKILL_STYLE_META[skill.id] ?? SKILL_STYLE_META['wool-felt'];
-                    return (
-                      <button
-                        key={skill.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={active}
-                        onClick={() => selectSkill(idx)}
-                        className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-[12px] font-paper-mono text-[11px] transition-all cursor-pointer whitespace-nowrap ${
-                          active
-                            ? 'bg-[#0F172A] text-[#FEFCF8] font-semibold shadow-sm'
-                            : 'text-[#786858] hover:bg-[#F6F5F0] hover:text-[#0F172A]'
-                        }`}
-                      >
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: meta.themeColor }}
-                        />
-                        <span>{skill.shortCn}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div
-                  aria-hidden="true"
-                  className="h-5 w-px bg-[#E5E7EB] mx-1 shrink-0"
-                />
-
-                {/* 2. Primary Actions with clear labels */}
-                <div className="flex items-center gap-1">
-                  {/* Stamp to desk with particle burst */}
-                  <button
-                    type="button"
-                    onClick={handleStampExhibit}
-                    title="将当前成果作为一张新邮票盖印到桌面上"
-                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[12px] bg-[#FCE055] text-[#0F172A] font-paper-mono text-[11px] font-semibold shadow-[0_2px_6px_rgba(15,23,42,0.12)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                  >
-                    <Stamp className="w-3.5 h-3.5" />
-                    <span>盖印收藏</span>
-                  </button>
-
-                  {/* Save final PNG */}
-                  {isVisualSkill && (
-                    <button
-                      type="button"
-                      onClick={handleDownloadArtwork}
-                      title="保存当前转绘作品 PNG"
-                      className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-[12px] text-[#374151] hover:bg-[#EDF4FF] hover:text-[#1E63D6] font-paper-mono text-[11px] transition-all cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">保存</span>
-                    </button>
-                  )}
-
-                  {/* Open recipe note */}
-                  <button
-                    type="button"
-                    onClick={() => setNoteOpen((v) => !v)}
-                    title="查看该 Skill 的 SKILL.md 技术配方与 Prompt"
-                    className={`inline-flex items-center gap-1.5 h-9 px-2.5 rounded-[12px] font-paper-mono text-[11px] transition-all cursor-pointer ${
-                      noteOpen
-                        ? 'bg-[#1E63D6] text-white font-semibold'
-                        : 'text-[#374151] hover:bg-[#F6F5F0]'
-                    }`}
-                  >
-                    <FileCode2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">配方</span>
-                  </button>
-
-                  {/* Clear desk */}
-                  {stamps.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setStamps([])}
-                      title={`清理桌面上已盖印的 ${stamps.length} 张邮票`}
-                      className="h-9 px-2 rounded-[12px] text-[#EF4E5E] hover:bg-[#FFF2F3] font-paper-mono text-[11px] transition-all cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>

@@ -80,31 +80,6 @@
   background-position: 0 0, 12px 12px;
 }
 
-/* Crisp architectural dot-matrix studio canvas */
-.dot-grid-paper {
-  background-color: #fefcf8;
-  background-image: radial-gradient(
-    rgba(15, 23, 42, 0.085) 1px,
-    transparent 0
-  );
-  background-size: 22px 22px;
-  background-position: 11px 11px;
-}
-
-/* Scalloped postage-stamp paper mask (paired with parent filter: drop-shadow) */
-.stamp-card-mask {
-  mask-image: linear-gradient(#000, #000),
-    radial-gradient(circle at 8px 8px, #000 5.6px, transparent 6px);
-  mask-position: center, 0 0;
-  mask-size: calc(100% - 10px) calc(100% - 10px), 16px 16px;
-  mask-repeat: no-repeat, round;
-  mask-composite: add;
-  -webkit-mask-image: linear-gradient(#000, #000),
-    radial-gradient(circle at 8px 8px, #000 5.6px, transparent 6px);
-  -webkit-mask-position: center, 0 0;
-  -webkit-mask-size: calc(100% - 10px) calc(100% - 10px), 16px 16px;
-  -webkit-mask-repeat: no-repeat, round;
-}
 
 /* ==========================================================================
    HERO VISUAL — IP sticker + three-node semicircle orbit
