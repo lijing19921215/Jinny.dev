@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { motion, useMotionValue } from 'motion/react';
+import { motion, useDragControls, useMotionValue } from 'motion/react';
 
 export interface ItemTransform {
   x: number;
@@ -60,21 +60,45 @@ interface EditableItemProps {
   base: ItemTransform;
   children: React.ReactElement;
   ariaLabel?: string;
+  /** Optional per-item move/scale bounds, in percent of the stage.
+   *  Defaults cover the whole stage (used by ordinary floor/wall objects).
+   *  The hanging lamp overrides these so it can never be dragged off-screen. */
+  bounds?: {
+    xMin?: number; xMax?: number;
+    yMin?: number; yMax?: number;
+    wMin?: number; hMin?: number;
+    wMax?: number; hMax?: number;
+  };
 }
 
 export const EditableItem: React.FC<EditableItemProps> = ({
   id,
   base,
   children,
-  ariaLabel
+  ariaLabel,
+  bounds
 }) => {
   const ctx = useItemCtx();
   const { editing, selectedId, setSelectedId, transforms, updateTransform, stageRef } = ctx;
   const t = transforms[id] ?? base;
   const selected = selectedId === id;
+  const xMin = bounds?.xMin ?? 4;
+  const xMax = bounds?.xMax ?? 96;
+  const yMin = bounds?.yMin ?? 6;
+  const yMax = bounds?.yMax ?? 94;
+  const wMin = bounds?.wMin ?? 3;
+  const hMin = bounds?.hMin ?? 3;
+  const wMax = bounds?.wMax ?? 80;
+  const hMax = bounds?.hMax ?? 92;
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
   const movedRef = useRef(false);
+  // Drag is started explicitly only from the item body. The resize/rotate
+  // handles below call stopPropagation, so they can never trigger a move drag.
+  // A plain `drag={editing}` would let framer-motion's native pointerdown
+  // listener also fire when grabbing a handle, shifting x/y while resizing
+  // and pushing the object off-screen (it looked like the shelf vanished).
+  const dragControls = useDragControls();
 
   const onDragEnd = useCallback(() => {
     if (!movedRef.current) return;
@@ -82,13 +106,13 @@ export const EditableItem: React.FC<EditableItemProps> = ({
     const w = stage?.clientWidth ?? 1;
     const h = stage?.clientHeight ?? 1;
     updateTransform(id, {
-      x: Math.min(96, Math.max(4, t.x + (dragX.get() / w) * 100)),
-      y: Math.min(94, Math.max(6, t.y + (dragY.get() / h) * 100))
+      x: Math.min(xMax, Math.max(xMin, t.x + (dragX.get() / w) * 100)),
+      y: Math.min(yMax, Math.max(yMin, t.y + (dragY.get() / h) * 100))
     });
     dragX.set(0);
     dragY.set(0);
     movedRef.current = false;
-  }, [dragX, dragY, id, t.x, t.y, updateTransform, stageRef]);
+  }, [dragX, dragY, id, t.x, t.y, xMin, xMax, yMin, yMax, updateTransform, stageRef]);
 
   const startResize = useCallback(
     (e: React.PointerEvent, dir: Dir) => {
@@ -105,21 +129,21 @@ export const EditableItem: React.FC<EditableItemProps> = ({
         const dxPct = ((ev.clientX - startX) / rect.width) * 100;
         const dyPct = ((ev.clientY - startY) / rect.height) * 100;
         let { x, y, w, h } = s;
-        if (dir.includes('e')) w = Math.max(3, s.w + dxPct);
-        if (dir.includes('s')) h = Math.max(3, s.h + dyPct);
+        if (dir.includes('e')) w = Math.max(wMin, s.w + dxPct);
+        if (dir.includes('s')) h = Math.max(hMin, s.h + dyPct);
         if (dir.includes('w')) {
-          w = Math.max(3, s.w - dxPct);
+          w = Math.max(wMin, s.w - dxPct);
           x = s.x + (s.w - w);
         }
         if (dir.includes('n')) {
-          h = Math.max(3, s.h - dyPct);
+          h = Math.max(hMin, s.h - dyPct);
           y = s.y + (s.h - h);
         }
         updateTransform(id, {
-          x: Math.min(96, Math.max(4, x)),
-          y: Math.min(94, Math.max(6, y)),
-          w: Math.min(80, w),
-          h: Math.min(92, h)
+          x: Math.min(xMax, Math.max(xMin, x)),
+          y: Math.min(yMax, Math.max(yMin, y)),
+          w: Math.min(wMax, w),
+          h: Math.min(hMax, h)
         });
       };
       const onUp = () => {
@@ -129,7 +153,7 @@ export const EditableItem: React.FC<EditableItemProps> = ({
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     },
-    [t, id, updateTransform, stageRef]
+    [t, id, xMin, xMax, yMin, yMax, wMin, hMin, wMax, hMax, updateTransform, stageRef]
   );
 
   const startRotate = useCallback(
@@ -196,12 +220,25 @@ export const EditableItem: React.FC<EditableItemProps> = ({
         touchAction: 'none'
       }}
       drag={editing}
-      dragConstraints={stageRef}
+      dragControls={dragControls}
+      dragListener={false}
+      /* No dragConstraints/dragElastic: framer-motion's elastic snap-back runs
+         AFTER onDragEnd and re-applies a translate offset that overwrites our
+         set(0), double-storing the position (top% + residual transform) and
+         pushing the object off-screen. Bounds are clamped manually instead. */
       dragMomentum={false}
-      dragElastic={0.03}
       onDragStart={() => { movedRef.current = true; }}
       onDragEnd={onDragEnd}
-      onPointerDown={() => { if (editing && !movedRef.current) setSelectedId(id); }}
+      onPointerDown={(e) => {
+        if (!editing) return;
+        // Ignore pointer-downs originating from a resize/rotate handle; those
+        // manage their own gesture via window listeners and must not move the
+        // whole item. Only the item body starts a drag.
+        const target = e.target as HTMLElement;
+        if (target.closest('[data-edit-handle]')) return;
+        setSelectedId(id);
+        dragControls.start(e);
+      }}
       data-editable-item={id}
       aria-label={ariaLabel}
     >
@@ -213,12 +250,14 @@ export const EditableItem: React.FC<EditableItemProps> = ({
           {DIRS.map((dir) => (
             <span
               key={dir}
+              data-edit-handle
               className="pointer-events-auto absolute rounded-[2px] border border-[#1E63D6] bg-white"
               style={{ width: HANDLE, height: HANDLE, ...DIR_STYLE[dir] }}
               onPointerDown={(e) => startResize(e, dir)}
             />
           ))}
           <span
+            data-edit-handle
             className="pointer-events-auto absolute left-1/2 rounded-full border-2 border-[#1E63D6] bg-white"
             style={{ width: 14, height: 14, top: -22, transform: 'translateX(-50%)', cursor: 'grab' }}
             onPointerDown={startRotate}

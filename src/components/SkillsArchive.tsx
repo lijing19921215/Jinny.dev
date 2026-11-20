@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { PORTFOLIO_SKILLS, PortfolioSkill } from '../data/skills';
 import { Topbar } from './Topbar';
+import LightCanvas from './LightCanvas';
+import BookShelfCanvas from './BookShelfCanvas';
 import {
   EditableItem,
   ItemContext,
@@ -40,100 +42,36 @@ interface FloatingQuip {
 const SPRING_SNAPPY = { type: 'spring' as const, stiffness: 320, damping: 22 };
 const BRAND_COLORS = ['#EF4E5E', '#1E63D6', '#D97706'];
 
-// Wall-clock hand endpoint in a 0 0 100 100 viewBox; 0deg points up (12 o'clock).
-const clockHandEnd = (angleDeg: number, length: number) => {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return { x2: 50 + Math.cos(rad) * length, y2: 50 + Math.sin(rad) * length };
-};
-
 // Evening runs 18:00 -> 06:00 local time; used to set the initial lamp/background state.
 const isNightNow = (): boolean => {
   const h = new Date().getHours();
   return h >= 18 || h < 6;
 };
 
-// Live petal clock, isolated so the 1s tick only re-renders this small SVG.
-const PetalClockFace: React.FC = () => {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+// v7: the hanging lamp could be dragged down until its shade/bulb fell out of
+// the viewport (y reached ~50 with h=50). Lamp is now y-locked to the ceiling;
+// bump so stale layouts carrying a dragged-off lamp are discarded on load.
+// v6 removed the clock; v5 fixed the handle/drag conflict.
+const LAYOUT_STORAGE_KEY = 'jinny-skills-layout-v7';
 
-  const seconds = now.getSeconds();
-  const minutes = now.getMinutes();
-  const hours = now.getHours() % 12;
-  const hourAngle = (hours + minutes / 60) * 30;
-  const minuteAngle = (minutes + seconds / 60) * 6;
-  const secondAngle = seconds * 6;
-
-  return (
-    <svg viewBox="0 0 100 100" className="w-full h-full block" aria-hidden="true">
-      <defs>
-        <radialGradient id="clock-wood" cx="50%" cy="46%" r="58%">
-          <stop offset="70%" stopColor="var(--canvas-bg)" />
-          <stop offset="100%" stopColor="var(--ink-muted)" stopOpacity="0.14" />
-        </radialGradient>
-      </defs>
-      {/* Wooden face: crisp hairline edge, no heavy shadow (design.md 4/6) */}
-      <circle cx="50" cy="50" r="48" fill="url(#clock-wood)" stroke="var(--hairline)" strokeWidth="1.2" />
-      {/* Smaller coral teardrop petals */}
-      {Array.from({ length: 12 }, (_, i) => (
-        <path
-          key={i}
-          transform={`rotate(${i * 30} 50 50)`}
-          d="M 50 30 C 47 28, 44 25, 44 18 C 44 13, 46.5 10, 50 10 C 53.5 10, 56 13, 56 18 C 56 25, 53 28, 50 30 Z"
-          fill="var(--spark-red)"
-        />
-      ))}
-      {/* Upright white numerals (as in the reference) */}
-      {Array.from({ length: 12 }, (_, i) => {
-        const a = (i * 30 * Math.PI) / 180;
-        return (
-          <text
-            key={i}
-            x={50 + 31 * Math.sin(a)}
-            y={50 - 31 * Math.cos(a)}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="font-paper-mono tabular-nums"
-            fontSize="9.5"
-            fontWeight="600"
-            fill="var(--surface-card)"
-          >
-            {i === 0 ? 12 : i}
-          </text>
-        );
-      })}
-      {/* Blue hub */}
-      <circle cx="50" cy="50" r="14" fill="var(--accent-blue)" />
-      {/* Live hour hand */}
-      <line x1="50" y1="50" {...clockHandEnd(hourAngle, 18)} stroke="var(--ink-muted)" strokeOpacity="0.35" strokeWidth="3.2" strokeLinecap="round" />
-      <line x1="50" y1="50" {...clockHandEnd(hourAngle, 18)} stroke="var(--surface-card)" strokeWidth="2" strokeLinecap="round" />
-      {/* Live minute hand */}
-      <line x1="50" y1="50" {...clockHandEnd(minuteAngle, 26)} stroke="var(--ink-muted)" strokeOpacity="0.35" strokeWidth="2.2" strokeLinecap="round" />
-      <line x1="50" y1="50" {...clockHandEnd(minuteAngle, 26)} stroke="var(--surface-card)" strokeWidth="1.3" strokeLinecap="round" />
-      {/* Live second hand */}
-      <line x1="50" y1="50" {...clockHandEnd(secondAngle, 30)} stroke="var(--surface-card)" strokeWidth="0.7" strokeLinecap="round" />
-      <circle cx="50" cy="50" r="2.2" fill="var(--surface-card)" />
-    </svg>
-  );
-};
-
-const LAYOUT_STORAGE_KEY = 'jinny-skills-layout-v1';
-
+// Layout follows the reference composition: editorial title top-left, a 2x2
+// gallery of frames beneath it, chandelier above the armchair + tea table in
+// the lower-middle, and the drawn bookshelf on the right.
 const ITEM_DEFS: ItemDef[] = [
-  { id: 'frame1', name: '小挂画 1', thumb: null, thumbBg: '#E6F1FB', base: { x: 2.8, y: 4.5, w: 6.2, h: 10.2, rotate: 0 }, baseZ: 15 },
-  { id: 'wool-felt', name: 'SKILL 01 毛毡风', thumb: '/assets/room/skill-motion.jpg', thumbBg: '#EDF4FF', base: { x: 10.8, y: 5.5, w: 8.2, h: 13.5, rotate: 0 }, baseZ: 20 },
-  { id: 'clock', name: '圆形挂钟', thumb: null, thumbBg: '#FFFFFF', base: { x: 3.2, y: 19.5, w: 7.2, h: 12, rotate: 0 }, baseZ: 15 },
-  { id: 'pastel-doll', name: 'SKILL 02 粉彩娃娃', thumb: '/assets/room/skill-tool.jpg', thumbBg: '#FEF9DB', base: { x: 12.5, y: 21.8, w: 8.5, h: 13, rotate: 0 }, baseZ: 20 },
-  { id: 'frame3', name: '植物小挂画', thumb: null, thumbBg: '#FFFFFF', base: { x: 21.5, y: 7.5, w: 7.4, h: 11.2, rotate: 0 }, baseZ: 15 },
-  { id: 'armchair', name: '单人扶手沙发', thumb: '/assets/room/armchair.png', thumbBg: '#E6ECF2', base: { x: 2.6, y: 39.5, w: 21.5, h: 38, rotate: 0 }, baseZ: 15 },
-  { id: 'table', name: '椭圆茶几', thumb: null, thumbBg: '#E3EEFB', base: { x: 28.5, y: 67, w: 32, h: 24.5, rotate: 0 }, baseZ: 22 },
-  { id: 'cup1', name: '碎花茶杯', thumb: '/assets/room/teacup.png', thumbBg: '#FFFFFF', base: { x: 30.2, y: 61.5, w: 4.6, h: 7.5, rotate: 0 }, baseZ: 26 },
-  { id: 'teapot', name: '碎花茶壶', thumb: '/assets/room/teapot.png', thumbBg: '#FFFFFF', base: { x: 36, y: 60, w: 8.5, h: 8, rotate: 0 }, baseZ: 26 },
-  { id: 'chandelier', name: '吊灯', thumb: null, thumbBg: '#F5F2EA', base: { x: 44, y: 0, w: 13, h: 50, rotate: 0 }, baseZ: 25 },
-  { id: 'design-restraint', name: 'SKILL 03 工作流', thumb: null, thumbBg: '#EDF4FF', base: { x: 64.2, y: 13.5, w: 27.8, h: 21.5, rotate: 0 }, baseZ: 18 }
+  // Upper-left gallery wall — scaled down to match the reference proportions.
+  { id: 'frame3', name: '植物小挂画', thumb: null, thumbBg: '#FFFFFF', base: { x: 3.5, y: 40, w: 4.8, h: 9.4, rotate: 0 }, baseZ: 15 },
+  { id: 'wool-felt', name: 'SKILL 01 毛毡风', thumb: '/assets/room/frame-flowers-1.jpg', thumbBg: '#EDF4FF', base: { x: 9.3, y: 40, w: 6, h: 9.4, rotate: 0 }, baseZ: 20 },
+  { id: 'frame1', name: '小挂画 1', thumb: null, thumbBg: '#E6F1FB', base: { x: 16.3, y: 40.3, w: 4.8, h: 8.2, rotate: 0 }, baseZ: 15 },
+  { id: 'pastel-doll', name: 'SKILL 02 粉彩娃娃', thumb: '/assets/room/frame-flowers-2.jpg', thumbBg: '#FEF9DB', base: { x: 3.5, y: 51.5, w: 5.6, h: 8.6, rotate: 0 }, baseZ: 20 },
+  // Upper-middle pendant lamp (shade centre ≈ 44% of width).
+  { id: 'chandelier', name: '吊灯', thumb: null, thumbBg: '#F5F2EA', base: { x: 38.5, y: 0, w: 11, h: 50, rotate: 0 }, baseZ: 25 },
+  // Lower-middle armchair + round tea table with cups.
+  { id: 'armchair', name: '单人扶手沙发', thumb: '/assets/room/armchair.png', thumbBg: '#E6ECF2', base: { x: 29, y: 62, w: 14, h: 30, rotate: 0 }, baseZ: 15 },
+  { id: 'table', name: '椭圆茶几', thumb: null, thumbBg: '#E3EEFB', base: { x: 43, y: 75, w: 15, h: 17, rotate: 0 }, baseZ: 22 },
+  { id: 'cup1', name: '碎花茶杯', thumb: '/assets/room/teacup.png', thumbBg: '#FFFFFF', base: { x: 45, y: 78, w: 4, h: 6, rotate: 0 }, baseZ: 26 },
+  { id: 'teapot', name: '碎花茶壶', thumb: '/assets/room/teapot.png', thumbBg: '#FFFFFF', base: { x: 50, y: 77, w: 7, h: 6.5, rotate: 0 }, baseZ: 26 },
+  // Right-side drawn bookshelf with label + info card — scaled down.
+  { id: 'design-restraint', name: 'SKILL 03 书架', thumb: null, thumbBg: '#EDF4FF', base: { x: 71, y: 60, w: 22, h: 33, rotate: 0 }, baseZ: 18 }
 ];
 
 const DEF_TRANSFORMS: TransformMap = Object.fromEntries(
@@ -152,11 +90,18 @@ function loadLayout(): TransformMap {
     for (const def of ITEM_DEFS) {
       const saved = parsed[def.id];
       if (!saved) continue;
+      const isLamp = def.id === 'chandelier';
       out[def.id] = {
         x: typeof saved.x === 'number' ? saved.x : def.base.x,
-        y: typeof saved.y === 'number' ? saved.y : def.base.y,
+        // The lamp hangs from the ceiling: never load a dragged-down y that
+        // would drop its shade/bulb out of the viewport.
+        y: isLamp
+          ? Math.min(6, Math.max(0, typeof saved.y === 'number' ? saved.y : def.base.y))
+          : (typeof saved.y === 'number' ? saved.y : def.base.y),
         w: typeof saved.w === 'number' ? saved.w : def.base.w,
-        h: typeof saved.h === 'number' ? saved.h : def.base.h,
+        h: isLamp
+          ? Math.min(60, Math.max(30, typeof saved.h === 'number' ? saved.h : def.base.h))
+          : (typeof saved.h === 'number' ? saved.h : def.base.h),
         rotate: typeof saved.rotate === 'number' ? saved.rotate : def.base.rotate,
         z: typeof saved.z === 'number' ? saved.z : def.baseZ
       };
@@ -343,28 +288,26 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
     stageRef
   };
 
-  // Room atmosphere: lamp on => evening backdrop. Auto-follows the clock,
-  // but a manual lamp click overrides that until the hour actually changes.
+  // Backdrop follows the clock only — toggling the lamp no longer changes it.
+  const [isNight, setIsNight] = useState<boolean>(isNightNow);
+  // The lamp switch still follows the clock initially and can be clicked.
   const [lampOn, setLampOn] = useState<boolean>(isNightNow);
-  const [manualLamp, setManualLamp] = useState(false);
   const lastHourRef = useRef(new Date().getHours());
   useEffect(() => {
     const sync = () => {
       const h = new Date().getHours();
       if (h !== lastHourRef.current) {
         lastHourRef.current = h;
-        setManualLamp(false);
-        setLampOn(isNightNow());
+        const night = isNightNow();
+        setIsNight(night);
+        setLampOn(night);
       }
     };
     const timer = window.setInterval(sync, 30_000);
     return () => window.clearInterval(timer);
   }, []);
-  const toggleLamp = () => {
-    setManualLamp(true);
-    setLampOn((v) => !v);
-  };
-  const eveningMode = lampOn;
+  const toggleLamp = () => setLampOn((v) => !v);
+  const eveningMode = isNight;
 
   // Tactile easter-egg animation counters
   const [tapCounts, setTapCounts] = useState<Record<string, number>>({});
@@ -634,12 +577,12 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
             }}
             className="relative z-10 flex-1 w-full flex flex-col items-center justify-start overflow-hidden"
           >
-            {/* Full-width room stage: width unconstrained, height yields room to caption */}
+            {/* Full-width room stage: fills the workspace; editorial title lives top-left */}
             <div
               style={{
                 containerType: 'inline-size',
                 width: '100cqw',
-                height: '74cqh'
+                height: '100cqh'
               }}
               className="relative select-none shrink-0"
             >
@@ -653,17 +596,28 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                   }}
                 />
 
-                {/* 1b. Warm light cast from the lamp when it's on at night */}
-                {eveningMode && (
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 transition-opacity duration-700"
-                    style={{
-                      background:
-                        'radial-gradient(ellipse 55% 70% at 50% 30%, rgba(252,224,85,0.22) 0%, rgba(252,224,85,0.08) 42%, rgba(252,224,85,0) 72%)'
-                    }}
-                  />
-                )}
+                {/* 1b. p5.js volumetric lamp light (dust + soft cone + pool).
+                    Sits below the object layer and never intercepts pointer input. */}
+                <LightCanvas on={lampOn} reducedMotion={Boolean(prefersReduced)} />
+
+                {/* Editorial title block — top-left, matching the reference. */}
+                <div
+                  className="pointer-events-none absolute z-[12]"
+                  style={{ left: '3cqw', top: '4.5cqh', width: '38cqw' }}
+                >
+                  <h2
+                    className="font-display font-light text-[#2C2A27] leading-[1.16] tracking-tight whitespace-nowrap"
+                    style={{ fontSize: '2.4cqw' }}
+                  >
+                    Chance Brings Them
+                    <br />
+                    Together Here And
+                    <br />
+                    <span className="italic text-[#5E7A4E]">Imagination</span> Endows Them
+                    <br />
+                    With Souls
+                  </h2>
+                </div>
 
                 {/* ============================================================
                     2. PLACEHOLDER LAYOUT LAYER (MATCHING REFERENCE COMPOSITION)
@@ -711,7 +665,7 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                   transition={SPRING_SNAPPY}
                   aria-label="探索 01 Wool Felt 毛毡风 Skill"
                   style={{ left: '10.8%', top: '5.5%', width: '8.2%', height: '13.5%' }}
-                  className={`absolute ${hoveredObj === 'wool-felt' ? 'z-40' : 'z-20'} cursor-pointer rounded-[0.7cqw] border-[0.2cqw] border-[#1E63D6] bg-[#EDF4FF] shadow-[0_6px_14px_rgba(30,99,214,0.12)] overflow-hidden focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                  className={`absolute ${hoveredObj === 'wool-felt' ? 'z-40' : 'z-20'} cursor-pointer flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
                 >
                   <ObjectTooltip
                     visible={hoveredObj === 'wool-felt'}
@@ -720,35 +674,11 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                     placement="bottom"
                   />
                   <img
-                    src="/assets/room/skill-motion.jpg"
-                    alt="SKILL 01 毛毡风"
+                    src="/assets/room/frame-flowers-1.jpg"
+                    alt="水彩花卉相框 1"
                     draggable={false}
-                    className="w-full h-full object-cover pointer-events-none select-none"
+                    className="w-full h-full object-contain pointer-events-none select-none drop-shadow-[0_0.6cqw_0.5cqw_rgba(60,45,30,0.16)]"
                   />
-                </motion.button>
-                </EditableItem>
-
-                {/* P2. Round Wall Clock — drawn in SVG per design.md */}
-                <EditableItem id="clock" base={DEF_TRANSFORMS['clock']}>
-                <motion.button
-                  type="button"
-                  onClick={() => {
-                    const count = (tapCounts.clock ?? 0) + 1;
-                    setTapCounts((p) => ({ ...p, clock: count }));
-                    playSoftDeskChime('click');
-                    spawnQuip('tick tock ♪', 7, 17);
-                  }}
-                  onMouseEnter={() => setHoveredObj('clock')}
-                  onMouseLeave={() => setHoveredObj(null)}
-                  whileHover={prefersReduced ? undefined : { rotate: 6, scale: 1.04 }}
-                  whileTap={prefersReduced ? undefined : { scale: 0.94 }}
-                  transition={SPRING_SNAPPY}
-                  aria-label="圆形墙挂钟"
-                  style={{ left: '3.2%', top: '19.5%', width: '7.2%', height: '12%' }}
-                  className={`absolute ${hoveredObj === 'clock' ? 'z-40' : 'z-15'} cursor-pointer focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
-                >
-                  <ObjectTooltip visible={hoveredObj === 'clock'} label="圆形墙挂钟" sublabel="点击互动" align="left" />
-                  <PetalClockFace />
                 </motion.button>
                 </EditableItem>
 
@@ -764,7 +694,7 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                   transition={SPRING_SNAPPY}
                   aria-label="探索 02 Pastel Doll 粉彩娃娃风 Skill"
                   style={{ left: '12.5%', top: '21.8%', width: '8.5%', height: '13%' }}
-                  className={`absolute ${hoveredObj === 'pastel-doll' ? 'z-40' : 'z-20'} cursor-pointer rounded-[0.7cqw] border-[0.2cqw] border-[#1E63D6] bg-[#FEF9DB] shadow-[0_6px_14px_rgba(30,99,214,0.12)] overflow-hidden focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                  className={`absolute ${hoveredObj === 'pastel-doll' ? 'z-40' : 'z-20'} cursor-pointer flex items-center justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
                 >
                   <ObjectTooltip
                     visible={hoveredObj === 'pastel-doll'}
@@ -772,10 +702,10 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                     sublabel="点击查看成品与配方"
                   />
                   <img
-                    src="/assets/room/skill-tool.jpg"
-                    alt="SKILL 02 粉彩娃娃风"
+                    src="/assets/room/frame-flowers-2.jpg"
+                    alt="水彩花卉相框 2"
                     draggable={false}
-                    className="w-full h-full object-cover pointer-events-none select-none"
+                    className="w-full h-full object-contain pointer-events-none select-none drop-shadow-[0_0.6cqw_0.5cqw_rgba(60,45,30,0.16)]"
                   />
                 </motion.button>
                 </EditableItem>
@@ -808,7 +738,11 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                 </EditableItem>
 
                 {/* --- HANGING CHANDELIER (TOP CENTER) --- */}
-                <EditableItem id="chandelier" base={DEF_TRANSFORMS['chandelier']}>
+                <EditableItem
+                  id="chandelier"
+                  base={DEF_TRANSFORMS['chandelier']}
+                  bounds={{ yMin: 0, yMax: 6, hMin: 30, hMax: 60 }}
+                >
                 <motion.button
                   type="button"
                   onClick={() => {
@@ -824,29 +758,29 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                   whileHover={prefersReduced ? undefined : { rotate: 3 }}
                   whileTap={prefersReduced ? undefined : { scale: 0.98 }}
                   aria-label={lampOn ? '关灯' : '开灯'}
+                  data-lamp
                   style={{ left: '44%', top: '0%', width: '13%', height: '50%' }}
                   className={`absolute origin-top ${hoveredObj === 'chandelier' ? 'z-40' : 'z-25'} cursor-pointer flex items-start justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
                 >
                   <ObjectTooltip visible={hoveredObj === 'chandelier'} label="极简吊灯" sublabel={lampOn ? '点击关灯' : '点击开灯'} align="center" />
                   <svg viewBox="0 0 100 100" className="w-full h-full block overflow-visible" aria-hidden="true">
                     <defs>
-                      <radialGradient id="lamp-glow" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stopColor="var(--highlight-yellow)" stopOpacity="0.55" />
-                        <stop offset="55%" stopColor="var(--highlight-yellow)" stopOpacity="0.22" />
-                        <stop offset="100%" stopColor="var(--highlight-yellow)" stopOpacity="0" />
+                      {/* Lit bulb: warm-white core fading softly to amber, no hard edge */}
+                      <radialGradient id="bulb-on-grad" cx="50%" cy="42%" r="72%">
+                        <stop offset="0%" stopColor="var(--surface-card)" />
+                        <stop offset="40%" stopColor="var(--highlight-yellow)" stopOpacity="0.9" />
+                        <stop offset="100%" stopColor="var(--highlight-yellow)" stopOpacity="0.5" />
                       </radialGradient>
-                      <linearGradient id="lamp-beam" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--highlight-yellow)" stopOpacity="0.34" />
-                        <stop offset="100%" stopColor="var(--highlight-yellow)" stopOpacity="0" />
-                      </linearGradient>
+                      {/* Unlit bulb: soft off-white glass */}
+                      <radialGradient id="bulb-off-grad" cx="50%" cy="38%" r="72%">
+                        <stop offset="0%" stopColor="#FFFFFF" />
+                        <stop offset="100%" stopColor="#E8E2D6" />
+                      </radialGradient>
+                      {/* Feathered spill so the glow bleeds past the bulb rim */}
+                      <filter id="bulb-soft" x="-160%" y="-160%" width="420%" height="420%">
+                        <feGaussianBlur stdDeviation="2.4" />
+                      </filter>
                     </defs>
-                    {/* Soft light spilling downward when the lamp is on (decorative only) */}
-                    {lampOn && (
-                      <g pointerEvents="none" className={prefersReduced ? '' : 'animate-pulse'}>
-                        <path d="M 44 97 L 56 97 L 84 148 L 16 148 Z" fill="url(#lamp-beam)" />
-                        <ellipse cx="50" cy="148" rx="40" ry="12" fill="url(#lamp-glow)" />
-                      </g>
-                    )}
                     <g fill="var(--ink-primary)">
                       {/* Ceiling mount cap */}
                       <path d="M 44 6 L 56 6 C 57 6 58 8 58 9 L 58 10 L 42 10 L 42 9 C 42 8 43 6 44 6 Z" />
@@ -859,17 +793,28 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
                       {/* Wide curved bell shade */}
                       <path d="M 49 76 C 47.5 78, 42 80, 34 83 C 27 85.5, 24 87, 23 90 C 23 91, 30 91.5, 50 91.5 C 70 91.5, 77 91, 77 90 C 76 87, 73 85.5, 66 83 C 58 80, 52.5 78, 51 76 Z" />
                     </g>
-                    {/* Bulb: white when off, warm yellow when on */}
+                    {/* Soft feathered glow bleeding from the lit bulb (no hard shape) */}
+                    {lampOn && (
+                      <ellipse
+                        cx="50"
+                        cy="95"
+                        rx="9.5"
+                        ry="6.5"
+                        fill="var(--highlight-yellow)"
+                        opacity="0.32"
+                        filter="url(#bulb-soft)"
+                        pointerEvents="none"
+                      />
+                    )}
+                    {/* Bulb body: soft gradient when lit, off-white glass when off.
+                        No hard highlight dot — removed for a cleaner glow. */}
                     <path
                       d="M 43.5 91.5 A 6.5 6.5 0 0 0 56.5 91.5 Z"
-                      fill={lampOn ? 'var(--highlight-yellow)' : 'var(--surface-card)'}
-                      stroke="var(--hairline)"
+                      fill={lampOn ? 'url(#bulb-on-grad)' : 'url(#bulb-off-grad)'}
+                      stroke={lampOn ? 'none' : 'var(--hairline)'}
                       strokeWidth="0.7"
                       pointerEvents="none"
                     />
-                    {lampOn && (
-                      <circle cx="50" cy="95" r="2" fill="var(--surface-card)" opacity="0.9" pointerEvents="none" />
-                    )}
                   </svg>
                 </motion.button>
                 </EditableItem>
@@ -980,43 +925,32 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
 
                 {/* --- UPPER-RIGHT FLOATING BOOKSHELF (SKILL 03 WORKFLOW) --- */}
 
-                {/* S3. CORE SKILL 03 — Floating Bookshelf */}
+                {/* S3. CORE SKILL 03 — p5.js-drawn bookshelf */}
                 <EditableItem id="design-restraint" base={DEF_TRANSFORMS['design-restraint']}>
                 <motion.button
                   type="button"
                   onClick={() => handleOpenSkill('design-restraint')}
                   onMouseEnter={() => setHoveredObj('design-restraint')}
                   onMouseLeave={() => setHoveredObj(null)}
-                  whileHover={prefersReduced ? undefined : { y: -4, scale: 1.02 }}
-                  whileTap={prefersReduced ? undefined : { scale: 0.97 }}
+                  whileHover={prefersReduced ? undefined : { y: -4 }}
+                  whileTap={prefersReduced ? undefined : { scale: 0.98 }}
                   transition={SPRING_SNAPPY}
                   aria-label="探索 03 Design Restraint 工作流 Skill"
-                  style={{ left: '64.2%', top: '13.5%', width: '27.8%', height: '21.5%' }}
-                  className={`absolute ${hoveredObj === 'design-restraint' ? 'z-40' : 'z-18'} cursor-pointer flex flex-col justify-end p-[0.6cqw] rounded-[0.8cqw] border-[0.2cqw] border-[#1E63D6] bg-[#EDF4FF]/85 shadow-[0_6px_16px_rgba(30,99,214,0.10)] focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
+                  style={{ left: '66%', top: '54%', width: '31%', height: '34%' }}
+                  className={`absolute ${hoveredObj === 'design-restraint' ? 'z-40' : 'z-18'} cursor-pointer flex flex-col justify-center focus-visible:outline-2 focus-visible:outline-[#1E63D6]`}
                 >
                   <ObjectTooltip
                     visible={hoveredObj === 'design-restraint'}
-                    label="03 · UI Restraint 工作流"
-                    sublabel="点击查看规范转换"
+                    label="03 · Design Restraint Audit"
+                    sublabel="点击查看工作流规范"
                     align="right"
                   />
-                  {/* Placeholder book & vase blocks sitting on shelf */}
-                  <div className="w-full flex-1 flex items-end justify-between gap-[0.6cqw] px-[0.4cqw] pb-[0.4cqw]">
-                    <div className="w-[18%] h-[78%] rounded-[0.3cqw] bg-[#FCE055]/65 border border-[#6E5644]/40" />
-                    <div className="w-[10%] h-[58%] rounded-[0.3cqw] bg-[#FFFFFF]/90 border border-[#6E5644]/40" />
-                    <div className="w-[24%] h-[88%] rounded-[0.3cqw] bg-[#D9E7FF] border border-[#1E63D6]/45 flex items-center justify-center">
-                      <span className="font-paper-mono text-[0.95cqw] font-semibold text-[#1E63D6]">
-                        SKILL 03
-                      </span>
-                    </div>
-                    <div className="w-[16%] h-[72%] rounded-[0.3cqw] bg-[#FAD4D8]/75 border border-[#EF4E5E]/40" />
-                    <div className="w-[14%] h-[64%] rounded-[0.4cqw] bg-[#F5F2EA] border border-[#6E5644]/40" />
+                  {/* p5-drawn books + wooden ledge. Label + info card removed;
+                      height locked to the previous canvas share so the shelf
+                      does not grow when its siblings are gone. */}
+                  <div style={{ height: '80%' }} className="relative w-full self-center">
+                    <BookShelfCanvas reducedMotion={Boolean(prefersReduced)} />
                   </div>
-                  {/* Shelf plank */}
-                  <div className="w-full h-[1cqw] rounded-full bg-[#B99878] border border-[#6E5644]/50 flex items-center justify-center" />
-                  <span className="font-paper-mono text-[0.9cqw] text-[#0F172A] mt-[0.35cqw] text-center">
-                    长条书架 · UI 工作流规范
-                  </span>
                 </motion.button>
                 </EditableItem>
 
@@ -1051,20 +985,6 @@ export const SkillsArchive: React.FC<SkillsArchiveProps> = ({
               </div>
             </div>
 
-            {/* Editorial caption below the room, echoing the reference layout */}
-            <div
-              className="w-full text-center shrink-0"
-              style={{ marginTop: '1.5cqh', paddingLeft: '4cqw', paddingRight: '4cqw' }}
-            >
-              <p
-                className="font-display font-light text-[#2C2A27] leading-[1.18] tracking-tight"
-                style={{ fontSize: '3.1cqw' }}
-              >
-                Chance Brings Them Together Here And
-                <br />
-                Imagination Endows Them With Souls
-              </p>
-            </div>
           </main>
 
           {/* ================================================================
